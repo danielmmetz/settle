@@ -18,10 +18,11 @@ There are no guarantees of any functionality or stability at this time.
   - in this sense, the resulting system should not be "workable" if a depedency is removed from config
   - it also means that settle can clean-up after itself, removing crumbs from previous runs
 * package management
-* (neo)vim is configurable with plugins
+* (neo)vim is configurable with plugins (coc.nvim plugins too)
 * zsh is configurable with plugins
 * support across macos and at least a single linux distro (one of arch, fedora, or solus)
 * make bootstrapping easy (e.g. `settle init github.com/<user>/<dofiles-repo>`)
+* config "profiles" by allowing config to reference other config
 
 ## Stretch goals
 
