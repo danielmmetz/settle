@@ -10,6 +10,7 @@ There are no guarantees of any functionality or stability at this time.
 * connect to sqlite (not yet used)
 * parse configuration file
 * ensure symlinks within configuration file
+* ensure repos within configuration file
 
 ## Intended feature set
 
