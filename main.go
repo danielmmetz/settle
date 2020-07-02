@@ -89,14 +89,14 @@ func loadConfig() (config, error) {
 type ensurer struct {
 	log   log.Log
 	files files.Files
-	vim   nvim.Nvim
+	nvim  nvim.Nvim
 	brew  *brew.Brew
 }
 
 func NewEnsurer(cfg config) ensurer {
 	return ensurer{
 		files: cfg.Files,
-		vim:   cfg.Nvim,
+		nvim:  cfg.Nvim,
 		brew:  cfg.Brew,
 	}
 }
@@ -105,7 +105,7 @@ func (e *ensurer) Ensure(ctx context.Context, logger log.Log) error {
 	if err := e.files.Ensure(logger); err != nil {
 		return err
 	}
-	if err := e.vim.Ensure(logger); err != nil {
+	if err := e.nvim.Ensure(ctx, logger); err != nil {
 		return err
 	}
 	return e.brew.Ensure(ctx, logger)

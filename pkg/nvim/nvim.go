@@ -1,9 +1,11 @@
 package nvim
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,17 +21,65 @@ type Nvim struct {
 	Config    NvimConfig
 }
 
-func (v Nvim) Ensure(logger log.Log) error {
+func (v Nvim) Ensure(ctx context.Context, logger log.Log) error {
+	if err := v.ensureVimPlug(ctx, logger); err != nil {
+		return fmt.Errorf("error ensuring vim-plug: %w", err)
+	}
 	var wg errgroup.Group
 	for _, plugin := range v.Plugins {
 		plugin := plugin
 		wg.Go(func() error { return v.ensurePlugin(logger, plugin) })
 	}
 	if err := wg.Wait(); err != nil {
+		return fmt.Errorf("error ensuring vim plugins: %w", err)
+	}
+	if err := v.ensureInitVim(logger); err != nil {
+		return fmt.Errorf("error ensuring init.vim: %w", err)
+	}
+	return nil
+}
+
+const (
+	vimPlugURL = "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
+)
+
+func (v Nvim) ensureVimPlug(ctx context.Context, logger log.Log) error {
+	if len(v.Plugins) == 0 {
+		return nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home dir: %w", err)
+	}
+	dstPath := filepath.Join(home, ".local", "share", "nvim", "site", "autoload", "plug.vim")
+
+	_, err = os.Stat(dstPath)
+	if err == nil {
+		logger.Debug("skipping vim-plug install: already present")
+		return nil // file already exists
+	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	return v.ensureInitVim(logger)
 
+	logger.Info("installing vim-plug")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, vimPlugURL, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+		return err
+	}
+	return ioutil.WriteFile(dstPath, content, 0755)
 }
 
 func (v Nvim) ensurePlugin(logger log.Log, p Plugin) error {
