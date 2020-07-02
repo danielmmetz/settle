@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS inventory (
 
 func main() {
 	fVerbose := flag.Bool("verbose", false, "enable verbose logging")
+	fDumpConfig := flag.Bool("dump-config", false, "pretty print config then exit without applying changes")
 	flag.Parse()
 
 	var logger log.Log
@@ -50,10 +52,13 @@ func main() {
 	if err != nil {
 		logger.Fatal("error loading config: %v", err)
 	}
-	logger.Debug("loaded config: %+v", config)
+	if *fDumpConfig {
+		logger.Info("%+v", config)
+		os.Exit(0)
+	}
 
-	e := ensurer{log: logger, cfg: config}
-	if err := e.ensure(ctx); err != nil {
+	e := NewEnsurer(config)
+	if err := e.Ensure(ctx, logger); err != nil {
 		logger.Fatal("error applying config: %v", err)
 	}
 }
@@ -64,8 +69,25 @@ func ensureTable(ctx context.Context, db *sql.DB) error {
 }
 
 type config struct {
-	Files []FileMapping
+	Files Files
 	Vim   Vim
+	Brew  Brew
+}
+
+func (c config) String() string {
+	pretty, _ := json.MarshalIndent(c, "", "  ")
+	return string(pretty)
+}
+
+type Files []FileMapping
+
+func (f Files) Ensure(logger log.Log) error {
+	for _, mapping := range f {
+		if err := mapping.ensure(logger); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type FileMapping struct {
@@ -94,11 +116,24 @@ func (m *FileMapping) UnmarshalYAML(unmarshal func(interface{}) error) error {
 type Vim struct {
 	PluginDir string `yaml:"plugin_dir"`
 	Plugins   []Plugin
-	Config    string
+	Config    VimConfig
+}
+
+func (v Vim) Ensure(logger log.Log) error {
+	var wg errgroup.Group
+	for _, plugin := range v.Plugins {
+		plugin := plugin
+		wg.Go(func() error { return v.ensurePlugin(logger, plugin) })
+	}
+	if err := wg.Wait(); err != nil {
+		return err
+	}
+	return v.ensureInitVim(logger)
+
 }
 
 func (v Vim) destDir(p Plugin) string {
-	return fmt.Sprintf("%s/%s", v.PluginDir, p.Name.Repo)
+	return fmt.Sprintf("%s/%s", v.PluginDir, p.Repo)
 }
 
 func (v Vim) initVim() string {
@@ -109,44 +144,25 @@ func (v Vim) initVim() string {
 	}
 	vimPlugLines = append(vimPlugLines, "call plug#end()")
 	vimPlugLines = append(vimPlugLines, "\n")
-	vimPlugLines = append(vimPlugLines, v.Config)
+	vimPlugLines = append(vimPlugLines, string(v.Config))
 	vimPlugLines = append(vimPlugLines, "\n")
 	return strings.Join(vimPlugLines, "\n")
 }
 
 type Plugin struct {
-	Name PluginName
-	Do   string
-	For  string
-}
-
-func (p Plugin) toVimPlug() string {
-	plugStatement := fmt.Sprintf("Plug '%v'", p.Name)
-	if p.Do == "" && p.For == "" {
-		return plugStatement
-	}
-	options := make(map[string]string)
-	if p.Do != "" {
-		options["do"] = p.Do
-	}
-	if p.For != "" {
-		options["for"] = p.For
-	}
-	jsonified, _ := json.Marshal(options)
-	formattedOptions := strings.ReplaceAll(string(jsonified), `"`, `'`)
-	return fmt.Sprintf("%s, %s", plugStatement, formattedOptions)
-}
-
-type PluginName struct {
 	Owner string
 	Repo  string
 }
 
-func (p PluginName) String() string {
+func (p Plugin) toVimPlug() string {
+	return fmt.Sprintf("Plug '%s'", p.String())
+}
+
+func (p Plugin) String() string {
 	return fmt.Sprintf("%s/%s", p.Owner, p.Repo)
 }
 
-func (p *PluginName) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (p *Plugin) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var intermediary string
 	if err := unmarshal(&intermediary); err != nil {
 		return err
@@ -160,8 +176,67 @@ func (p *PluginName) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func (p Plugin) String() string {
-	return p.Name.String()
+type VimConfig string
+
+func (c VimConfig) MarshalJSON() ([]byte, error) {
+	if len(c) > 0 {
+		return json.Marshal("(present but omitted)")
+	}
+	return []byte("(empty)"), nil
+}
+
+type Brew struct {
+	Taps []string
+	Pkgs []struct {
+		Name string
+		Args []string
+	}
+	Casks []string
+}
+
+func (b Brew) Ensure(ctx context.Context, logger log.Log) error {
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		return fmt.Errorf("error creating temporary Brewfile: %w", err)
+	}
+	if _, err := f.WriteString(b.brewfile()); err != nil {
+		return err
+	}
+	logger.Debug("wrote temporary Brewfile to: %s", f.Name())
+
+	logger.Info("installing packages with `brew bundle`")
+	installCmd := exec.CommandContext(ctx, "brew", "bundle", "--file", f.Name())
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("error running `brew bundle`: %w", err)
+	}
+	logger.Info("cleaning up orphan packages with `brew bundle cleanup`")
+	cleanupCmd := exec.CommandContext(ctx, "brew", "bundle", "cleanup", "--force", "--file", f.Name())
+	if err := cleanupCmd.Run(); err != nil {
+		return fmt.Errorf("error running `brew bundle cleanup`: %w", err)
+	}
+	return nil
+}
+
+func (b Brew) brewfile() string {
+	var lines []string
+	for _, tap := range b.Taps {
+		lines = append(lines, fmt.Sprintf(`tap "%s"`, tap))
+	}
+	for _, pkg := range b.Pkgs {
+		lineComponents := []string{fmt.Sprintf(`brew "%s"`, pkg.Name)}
+		if len(pkg.Args) > 0 {
+			lineComponents = append(lineComponents, ", args: [")
+			for _, arg := range pkg.Args {
+				lineComponents = append(lineComponents, fmt.Sprintf(`"%s"`, arg))
+			}
+			lineComponents = append(lineComponents, "]")
+		}
+		lines = append(lines, strings.Join(lineComponents, ""))
+	}
+	for _, cask := range b.Casks {
+		lines = append(lines, fmt.Sprintf(`cask "%s"`, cask))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func loadConfig() (config, error) {
@@ -175,64 +250,67 @@ func loadConfig() (config, error) {
 }
 
 type ensurer struct {
-	log log.Log
-	cfg config
+	log   log.Log
+	files Files
+	vim   Vim
+	brew  Brew
 }
 
-func (e ensurer) ensure(ctx context.Context) error {
-	for _, mapping := range e.cfg.Files {
-		if err := e.ensureFileMapping(mapping); err != nil {
-			return err
-		}
+func NewEnsurer(cfg config) ensurer {
+	return ensurer{
+		files: cfg.Files,
+		vim:   cfg.Vim,
+		brew:  cfg.Brew,
 	}
-	var wg errgroup.Group
-	for _, plugin := range e.cfg.Vim.Plugins {
-		plugin := plugin
-		wg.Go(func() error { return e.ensureVimPlugin(plugin) })
-	}
-	if err := wg.Wait(); err != nil {
+}
+
+func (e *ensurer) Ensure(ctx context.Context, logger log.Log) error {
+	if err := e.files.Ensure(logger); err != nil {
 		return err
 	}
-	return e.ensureInitVim()
+	if err := e.vim.Ensure(logger); err != nil {
+		return err
+	}
+	return e.brew.Ensure(ctx, logger)
 }
 
-func (e ensurer) ensureFileMapping(m FileMapping) error {
+func (m FileMapping) ensure(logger log.Log) error {
 	_, err := os.Lstat(m.Dst)
 	if errors.Is(err, os.ErrNotExist) {
 		// do nothing
 	} else if err != nil {
 		return err
 	} else if err == nil {
-		e.log.Debug("file exists, deleting it: %s", m.Dst)
+		logger.Debug("file exists, deleting it: %s", m.Dst)
 		if err := os.Remove(m.Dst); err != nil {
 			return err
 		}
 	}
-	e.log.Debug("symlinking %v to %v", m.Src, m.Dst)
+	logger.Debug("symlinking %v to %v", m.Src, m.Dst)
 	return os.Symlink(m.Src, m.Dst)
 }
 
-func (e ensurer) ensureVimPlugin(p Plugin) error {
-	dst := e.cfg.Vim.destDir(p)
+func (v Vim) ensurePlugin(logger log.Log, p Plugin) error {
+	dst := v.destDir(p)
 	_, err := git.PlainOpen(dst)
 	if err == git.ErrRepositoryNotExists {
 		// do nothing
 	} else if err != nil {
 		return fmt.Errorf("unable to check for existing repo for %v: %w", p, err)
 	} else if err == nil {
-		e.log.Debug("repo exists, skipping clone for %v", p)
+		logger.Debug("repo exists, skipping clone for %v", p)
 		return nil
 	}
 
-	e.log.Info("cloning repo %v into %s", p, dst)
+	logger.Info("cloning repo %v into %s", p, dst)
 	_, err = git.PlainClone(dst, false, &git.CloneOptions{
-		URL: fmt.Sprintf("https://github.com/%s/%s.git", p.Name.Owner, p.Name.Repo),
+		URL: fmt.Sprintf("https://github.com/%s/%s.git", p.Owner, p.Repo),
 	})
 	return err
 }
 
-func (e ensurer) ensureInitVim() error {
-	if len(e.cfg.Vim.Plugins) == 0 && e.cfg.Vim.Config == "" {
+func (v Vim) ensureInitVim(logger log.Log) error {
+	if len(v.Plugins) == 0 && v.Config == "" {
 		return nil
 	}
 	home, err := os.UserHomeDir()
@@ -240,6 +318,6 @@ func (e ensurer) ensureInitVim() error {
 		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
 	cfgPath := filepath.Join(home, ".config", "nvim", "init.vim")
-	e.log.Info("writing vim config to %s", cfgPath)
-	return ioutil.WriteFile(cfgPath, []byte(e.cfg.Vim.initVim()), 0755)
+	logger.Info("writing vim config to %s", cfgPath)
+	return ioutil.WriteFile(cfgPath, []byte(v.initVim()), 0755)
 }
