@@ -9,11 +9,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/danielmmetz/settle/pkg/log"
 	"github.com/go-git/go-git/v5"
 	_ "github.com/mattn/go-sqlite3"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 )
@@ -29,50 +29,31 @@ func main() {
 	fVerbose := flag.Bool("verbose", false, "enable verbose logging")
 	flag.Parse()
 
-	logCfg := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Encoding:    "console",
-		EncoderConfig: zapcore.EncoderConfig{
-			LevelKey:      "L",
-			MessageKey:    "M",
-			StacktraceKey: "S",
-			LineEnding:    zapcore.DefaultLineEnding,
-		},
-		OutputPaths:      []string{"stderr"},
-		ErrorOutputPaths: []string{"stderr"},
-	}
+	var logger log.Log
 	if *fVerbose {
-		logCfg.Development = true
-		logCfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
-	}
-
-	logger, err := logCfg.Build()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error building logger: %v\n", err)
-		os.Exit(1)
+		logger.Level = log.LevelDebug
 	}
 
 	db, err := sql.Open("sqlite3", "inventory.db")
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("error opening db: %v", err))
+		logger.Fatal("error opening db: %v", err)
 	}
 	defer db.Close()
 
 	ctx := context.Background()
 	if err := ensureTable(ctx, db); err != nil {
-		logger.Fatal(fmt.Sprintf("error ensuring table: %v", err))
+		logger.Fatal("error ensuring table: %v", err)
 	}
 
 	config, err := loadConfig()
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("error loading config: %v", err))
+		logger.Fatal("error loading config: %v", err)
 	}
-	logger.Debug(fmt.Sprintf("loaded config: %+v", config))
+	logger.Debug("loaded config: %+v", config)
 
 	e := ensurer{log: logger, cfg: config}
 	if err := e.ensure(ctx); err != nil {
-		logger.Fatal(fmt.Sprintf("error applying config: %v", err))
+		logger.Fatal("error applying config: %v", err)
 	}
 }
 
@@ -83,7 +64,7 @@ func ensureTable(ctx context.Context, db *sql.DB) error {
 
 type config struct {
 	Files []FileMapping
-	Repos []RepoMapping
+	Vim   Vim
 }
 
 type FileMapping struct {
@@ -109,9 +90,50 @@ func (m *FileMapping) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-type RepoMapping struct {
-	Src string
-	Dst string
+type Vim struct {
+	PluginDir string `yaml:"plugin_dir"`
+	Plugins   []Plugin
+	Config    string
+}
+
+func (v Vim) destDir(p Plugin) string {
+	return fmt.Sprintf("%s/%s", v.PluginDir, p.Repo)
+}
+
+func (v Vim) initVim() string {
+	var vimPlugLines []string
+	vimPlugLines = append(vimPlugLines, fmt.Sprintf("call plug#begin('%s')", v.PluginDir))
+	for _, plugin := range v.Plugins {
+		vimPlugLines = append(vimPlugLines, fmt.Sprintf("Plug '%v'", plugin))
+	}
+	vimPlugLines = append(vimPlugLines, "call plug#end()")
+	vimPlugLines = append(vimPlugLines, "\n")
+	vimPlugLines = append(vimPlugLines, v.Config)
+	vimPlugLines = append(vimPlugLines, "\n")
+	return strings.Join(vimPlugLines, "\n")
+}
+
+type Plugin struct {
+	Owner string
+	Repo  string
+}
+
+func (p *Plugin) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var intermediary string
+	if err := unmarshal(&intermediary); err != nil {
+		return err
+	}
+	components := strings.Split(intermediary, "/")
+	if len(components) != 2 {
+		return fmt.Errorf(`expected plugin to resemble "owner/repo": got %s`, intermediary)
+	}
+	p.Owner = components[0]
+	p.Repo = components[1]
+	return nil
+}
+
+func (p Plugin) String() string {
+	return fmt.Sprintf("%s/%s", p.Owner, p.Repo)
 }
 
 func loadConfig() (config, error) {
@@ -125,7 +147,7 @@ func loadConfig() (config, error) {
 }
 
 type ensurer struct {
-	log *zap.Logger
+	log log.Log
 	cfg config
 }
 
@@ -136,11 +158,14 @@ func (e ensurer) ensure(ctx context.Context) error {
 		}
 	}
 	var wg errgroup.Group
-	for _, mapping := range e.cfg.Repos {
-		mapping := mapping
-		wg.Go(func() error { return e.ensureRepoMapping(mapping) })
+	for _, plugin := range e.cfg.Vim.Plugins {
+		plugin := plugin
+		wg.Go(func() error { return e.ensureVimPlugin(plugin) })
 	}
-	return wg.Wait()
+	if err := wg.Wait(); err != nil {
+		return err
+	}
+	return e.ensureInitVim()
 }
 
 func (e ensurer) ensureFileMapping(m FileMapping) error {
@@ -150,29 +175,43 @@ func (e ensurer) ensureFileMapping(m FileMapping) error {
 	} else if err != nil {
 		return err
 	} else if err == nil {
-		e.log.Debug(fmt.Sprintf("file exists, deleting it: %s", m.Dst))
+		e.log.Debug("file exists, deleting it: %s", m.Dst)
 		if err := os.Remove(m.Dst); err != nil {
 			return err
 		}
 	}
-	e.log.Debug(fmt.Sprintf("symlinking %v to %v", m.Src, m.Dst))
+	e.log.Debug("symlinking %v to %v", m.Src, m.Dst)
 	return os.Symlink(m.Src, m.Dst)
 }
 
-func (e ensurer) ensureRepoMapping(m RepoMapping) error {
-	_, err := git.PlainOpen(m.Dst)
+func (e ensurer) ensureVimPlugin(p Plugin) error {
+	dst := e.cfg.Vim.destDir(p)
+	_, err := git.PlainOpen(dst)
 	if err == git.ErrRepositoryNotExists {
 		// do nothing
 	} else if err != nil {
-		return fmt.Errorf("unable to check for existing repo: %w", err)
+		return fmt.Errorf("unable to check for existing repo for %v: %w", p, err)
 	} else if err == nil {
-		e.log.Debug(fmt.Sprintf("repo exists, skipping clone: %s", m.Src))
+		e.log.Debug("repo exists, skipping clone for %v", p)
 		return nil
 	}
 
-	e.log.Info(fmt.Sprintf("cloning repo %s into %s", m.Src, m.Dst))
-	_, err = git.PlainClone(m.Dst, false, &git.CloneOptions{
-		URL: fmt.Sprintf("https://github.com/%s.git", m.Src),
+	e.log.Info("cloning repo %v into %s", p, dst)
+	_, err = git.PlainClone(dst, false, &git.CloneOptions{
+		URL: fmt.Sprintf("https://github.com/%s/%s.git", p.Owner, p.Repo),
 	})
 	return err
+}
+
+func (e ensurer) ensureInitVim() error {
+	if len(e.cfg.Vim.Plugins) == 0 && e.cfg.Vim.Config == "" {
+		return nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home dir: %w", err)
+	}
+	cfgPath := filepath.Join(home, ".config", "nvim", "init.vim")
+	e.log.Info("writing vim config to %s", cfgPath)
+	return ioutil.WriteFile(cfgPath, []byte(e.cfg.Vim.initVim()), 0755)
 }
