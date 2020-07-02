@@ -71,7 +71,7 @@ func ensureTable(ctx context.Context, db *sql.DB) error {
 type config struct {
 	Files Files
 	Vim   Vim
-	Brew  Brew
+	Brew  *Brew
 }
 
 func (c config) String() string {
@@ -194,7 +194,11 @@ type Brew struct {
 	Casks []string
 }
 
-func (b Brew) Ensure(ctx context.Context, logger log.Log) error {
+func (b *Brew) Ensure(ctx context.Context, logger log.Log) error {
+	if b == nil {
+		return nil
+	}
+
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
 		return fmt.Errorf("error creating temporary Brewfile: %w", err)
@@ -217,7 +221,7 @@ func (b Brew) Ensure(ctx context.Context, logger log.Log) error {
 	return nil
 }
 
-func (b Brew) brewfile() string {
+func (b *Brew) brewfile() string {
 	var lines []string
 	for _, tap := range b.Taps {
 		lines = append(lines, fmt.Sprintf(`tap "%s"`, tap))
@@ -253,7 +257,7 @@ type ensurer struct {
 	log   log.Log
 	files Files
 	vim   Vim
-	brew  Brew
+	brew  *Brew
 }
 
 func NewEnsurer(cfg config) ensurer {
