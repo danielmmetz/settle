@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -97,14 +98,14 @@ type Vim struct {
 }
 
 func (v Vim) destDir(p Plugin) string {
-	return fmt.Sprintf("%s/%s", v.PluginDir, p.Repo)
+	return fmt.Sprintf("%s/%s", v.PluginDir, p.Name.Repo)
 }
 
 func (v Vim) initVim() string {
 	var vimPlugLines []string
 	vimPlugLines = append(vimPlugLines, fmt.Sprintf("call plug#begin('%s')", v.PluginDir))
 	for _, plugin := range v.Plugins {
-		vimPlugLines = append(vimPlugLines, fmt.Sprintf("Plug '%v'", plugin))
+		vimPlugLines = append(vimPlugLines, plugin.toVimPlug())
 	}
 	vimPlugLines = append(vimPlugLines, "call plug#end()")
 	vimPlugLines = append(vimPlugLines, "\n")
@@ -114,11 +115,38 @@ func (v Vim) initVim() string {
 }
 
 type Plugin struct {
+	Name PluginName
+	Do   string
+	For  string
+}
+
+func (p Plugin) toVimPlug() string {
+	plugStatement := fmt.Sprintf("Plug '%v'", p.Name)
+	if p.Do == "" && p.For == "" {
+		return plugStatement
+	}
+	options := make(map[string]string)
+	if p.Do != "" {
+		options["do"] = p.Do
+	}
+	if p.For != "" {
+		options["for"] = p.For
+	}
+	jsonified, _ := json.Marshal(options)
+	formattedOptions := strings.ReplaceAll(string(jsonified), `"`, `'`)
+	return fmt.Sprintf("%s, %s", plugStatement, formattedOptions)
+}
+
+type PluginName struct {
 	Owner string
 	Repo  string
 }
 
-func (p *Plugin) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (p PluginName) String() string {
+	return fmt.Sprintf("%s/%s", p.Owner, p.Repo)
+}
+
+func (p *PluginName) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var intermediary string
 	if err := unmarshal(&intermediary); err != nil {
 		return err
@@ -133,7 +161,7 @@ func (p *Plugin) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (p Plugin) String() string {
-	return fmt.Sprintf("%s/%s", p.Owner, p.Repo)
+	return p.Name.String()
 }
 
 func loadConfig() (config, error) {
@@ -198,7 +226,7 @@ func (e ensurer) ensureVimPlugin(p Plugin) error {
 
 	e.log.Info("cloning repo %v into %s", p, dst)
 	_, err = git.PlainClone(dst, false, &git.CloneOptions{
-		URL: fmt.Sprintf("https://github.com/%s/%s.git", p.Owner, p.Repo),
+		URL: fmt.Sprintf("https://github.com/%s/%s.git", p.Name.Owner, p.Name.Repo),
 	})
 	return err
 }
