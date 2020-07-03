@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS inventory (
 func main() {
 	fVerbose := flag.Bool("verbose", false, "enable verbose logging")
 	fDumpConfig := flag.Bool("dump-config", false, "pretty print config then exit without applying changes")
+	fSkipBrew := flag.Bool("skip-brew", false, "skip applying brew changes")
 	flag.Parse()
 
 	var logger log.Log
@@ -45,7 +46,7 @@ func main() {
 		logger.Fatal("error ensuring table: %v", err)
 	}
 
-	config, err := loadConfig()
+	config, err := loadConfig(*fSkipBrew)
 	if err != nil {
 		logger.Fatal("error loading config: %v", err)
 	}
@@ -76,13 +77,16 @@ func (c config) String() string {
 	return string(pretty)
 }
 
-func loadConfig() (config, error) {
+func loadConfig(skipBrew bool) (config, error) {
 	bytes, err := ioutil.ReadFile("settle.yaml")
 	if err != nil {
 		return config{}, fmt.Errorf("error loading settle.yaml: %w", err)
 	}
 	var result config
 	err = yaml.Unmarshal(bytes, &result)
+	if skipBrew {
+		result.Brew = nil
+	}
 	return result, err
 }
 
