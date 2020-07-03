@@ -9,16 +9,26 @@ There are no guarantees of any functionality or stability at this time.
 
 * connect to sqlite (not yet used)
 * parse configuration file
+
+
+**File Symlinking**:
 * ensure symlinks within configuration file
-* ensure repos within configuration file
+
+**Neovim Support**:
+* clone (neo)vim plugins into a specified directory
+* install vim-plug
+* generate `init.vim` from specified plugins and additional config
+
+**Brew Support**:
+* supports taps, ordinary packages, and casks
+* cleans up packages no longer specified
 
 ## Intended feature set
 
 * garbage collection: files created by a previous invocation but no longer preset in config are deleted
   - in this sense, the resulting system should not be "workable" if a depedency is removed from config
   - it also means that settle can clean-up after itself, removing crumbs from previous runs
-* package management
-* (neo)vim is configurable with plugins (coc.nvim plugins too)
+* multi-platform package management
 * zsh is configurable with plugins
 * support across macos and at least a single linux distro (one of arch, fedora, or solus)
 * make bootstrapping easy (e.g. `settle init github.com/<user>/<dofiles-repo>`)
