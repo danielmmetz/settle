@@ -28,7 +28,7 @@ func (v Nvim) Ensure(ctx context.Context, logger log.Log) error {
 	var wg errgroup.Group
 	for _, plugin := range v.Plugins {
 		plugin := plugin
-		wg.Go(func() error { return v.ensurePlugin(logger, plugin) })
+		wg.Go(func() error { return v.ensurePlugin(ctx, logger, plugin) })
 	}
 	if err := wg.Wait(); err != nil {
 		return fmt.Errorf("error ensuring vim plugins: %w", err)
@@ -82,7 +82,7 @@ func (v Nvim) ensureVimPlug(ctx context.Context, logger log.Log) error {
 	return ioutil.WriteFile(dstPath, content, 0755)
 }
 
-func (v Nvim) ensurePlugin(logger log.Log, p Plugin) error {
+func (v Nvim) ensurePlugin(ctx context.Context, logger log.Log, p Plugin) error {
 	dst := v.destDir(p)
 	_, err := git.PlainOpen(dst)
 	if err == git.ErrRepositoryNotExists {
@@ -95,8 +95,9 @@ func (v Nvim) ensurePlugin(logger log.Log, p Plugin) error {
 	}
 
 	logger.Info("cloning repo %v into %s", p, dst)
-	_, err = git.PlainClone(dst, false, &git.CloneOptions{
-		URL: fmt.Sprintf("https://github.com/%s/%s.git", p.Owner, p.Repo),
+	_, err = git.PlainCloneContext(ctx, dst, false, &git.CloneOptions{
+		URL:   fmt.Sprintf("https://github.com/%s/%s.git", p.Owner, p.Repo),
+		Depth: 1,
 	})
 	return err
 }
