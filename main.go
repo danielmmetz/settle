@@ -13,16 +13,10 @@ import (
 	"github.com/danielmmetz/settle/pkg/files"
 	"github.com/danielmmetz/settle/pkg/log"
 	"github.com/danielmmetz/settle/pkg/nvim"
+	"github.com/danielmmetz/settle/pkg/store"
 	_ "github.com/mattn/go-sqlite3"
 	"gopkg.in/yaml.v2"
 )
-
-const ensureTableStatement = `
-CREATE TABLE IF NOT EXISTS inventory (
-	src TEXT NOT NULL UNIQUE,
-	dst TEXT NOT NULL UNIQUE
-);
-`
 
 func main() {
 	fVerbose := flag.Bool("verbose", false, "enable verbose logging")
@@ -42,7 +36,8 @@ func main() {
 	defer db.Close()
 
 	ctx := context.Background()
-	if err := ensureTable(ctx, db); err != nil {
+	inventory := store.New(db)
+	if err := inventory.EnsureTable(ctx); err != nil {
 		logger.Fatal("error ensuring table: %v", err)
 	}
 
@@ -59,11 +54,6 @@ func main() {
 	if err := e.Ensure(ctx, logger); err != nil {
 		logger.Fatal("error applying config: %v", err)
 	}
-}
-
-func ensureTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, ensureTableStatement)
-	return err
 }
 
 type config struct {
