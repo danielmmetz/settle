@@ -36,71 +36,79 @@ func main() {
 	defer db.Close()
 
 	ctx := context.Background()
-	inventory := store.New(db)
-	if err := inventory.EnsureTable(ctx); err != nil {
-		logger.Fatal("error ensuring table: %v", err)
-	}
-
-	config, err := loadConfig(*fSkipBrew)
-	if err != nil {
+	e := ensurer{log: logger, store: store.New(db)}
+	if err := e.loadConfig(*fSkipBrew); err != nil {
 		logger.Fatal("error loading config: %v", err)
 	}
 	if *fDumpConfig {
-		logger.Info("%+v", config)
+		logger.Info(e.dumpConfig())
 		os.Exit(0)
 	}
 
-	e := NewEnsurer(config)
-	if err := e.Ensure(ctx, logger); err != nil {
+	if err := e.Ensure(ctx); err != nil {
 		logger.Fatal("error applying config: %v", err)
 	}
 }
 
-type config struct {
-	Files files.Files
-	Nvim  nvim.Nvim
-	Brew  *brew.Brew
-}
-
-func (c config) String() string {
-	pretty, _ := json.MarshalIndent(c, "", "  ")
-	return string(pretty)
-}
-
-func loadConfig(skipBrew bool) (config, error) {
+func (e *ensurer) loadConfig(skipBrew bool) error {
 	bytes, err := ioutil.ReadFile("settle.yaml")
 	if err != nil {
-		return config{}, fmt.Errorf("error loading settle.yaml: %w", err)
+		return fmt.Errorf("error loading settle.yaml: %w", err)
 	}
-	var result config
-	err = yaml.Unmarshal(bytes, &result)
-	if skipBrew {
-		result.Brew = nil
+	var config struct {
+		Files files.Files
+		Nvim  nvim.Nvim
+		Brew  *brew.Brew
 	}
-	return result, err
+	if err = yaml.Unmarshal(bytes, &config); err != nil {
+		return err
+	}
+
+	e.files = config.Files
+	e.nvim = config.Nvim
+	if !skipBrew {
+		e.brew = config.Brew
+	}
+	return err
 }
 
 type ensurer struct {
 	log   log.Log
+	store store.Store
 	files files.Files
 	nvim  nvim.Nvim
 	brew  *brew.Brew
 }
 
-func NewEnsurer(cfg config) ensurer {
-	return ensurer{
-		files: cfg.Files,
-		nvim:  cfg.Nvim,
-		brew:  cfg.Brew,
+func (e *ensurer) Ensure(ctx context.Context) error {
+	if err := e.store.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring table: %w", err)
 	}
+	if err := e.files.Ensure(ctx, e.log, e.store); err != nil {
+		return err
+	}
+	if err := e.nvim.Ensure(ctx, e.log, e.store); err != nil {
+		return err
+	}
+	if err := e.brew.Ensure(ctx, e.log, e.store); err != nil {
+		return err
+	}
+	if err := e.store.Cleanup(); err != nil {
+		return fmt.Errorf("error during garbage collection: %w", err)
+	}
+	return nil
 }
 
-func (e *ensurer) Ensure(ctx context.Context, logger log.Log) error {
-	if err := e.files.Ensure(logger); err != nil {
-		return err
+func (e *ensurer) dumpConfig() string {
+	c := struct {
+		Files files.Files
+		Nvim  nvim.Nvim
+		Brew  *brew.Brew
+	}{
+		Files: e.files,
+		Nvim:  e.nvim,
+		Brew:  e.brew,
 	}
-	if err := e.nvim.Ensure(ctx, logger); err != nil {
-		return err
-	}
-	return e.brew.Ensure(ctx, logger)
+	pretty, _ := json.MarshalIndent(c, "", "  ")
+	return string(pretty)
 }
