@@ -1,0 +1,61 @@
+# Storage Design
+
+## Goals
+
+* garbage collection: settle should prune unnecessary side-effects ensured by previous configuration
+* idempotency: re-running with the same configuration shouldn't meaningfully change the system
+* speed:
+
+## Non-Goals (for now)
+
+* atomicity: in the ideal, an error during reconcilation should not leave corrupt/half-ensured states
+  - for now this is considered acceptable as a second run should fix the system (see idempotency goal)
+
+## Selected Approach
+
+### A Kubernetes controller-esque approach
+
+The rough idea here is a two-phase approach:
+  * phase 1: update the data in the database (equivalent to creating/updating a CRD)
+  * phase 2: reconcile the world (filesystem) against the intended state in the datbase
+      * for entities in the db but not present in the world: create them
+      * for entities in the db and present in the world: verify their correctness
+      * for entities not in the db but present in the world: prune them
+
+Pros:
+  * idempotency is easy
+  * plugins can have their own independent tables (data models)
+  * plugin state-of-the-world reconcilers can have their logic in one place
+  * garbage collection responsibility defered to the plugin that knows the situation best
+  * tombstoning/garbage collection shouldn't be too difficult
+
+Cons:
+  * tombstoning/garbage collection is always at least a little tricky
+
+#### Tombstoning / Garbage Collection
+
+Before updating configuration in the db, mark all rows in all tables with tombstones.
+Then when updating configuration in the db, ensure all newly created or updated rows have their tombstone voided.
+
+## Alternatives Considered
+
+### Storage as an Intermediary
+
+The rough idea here is that any intended side-effect is achieved by effect of a storage intermediary interface.
+For example: rather than have any particular plugin be responsible for its own interactions with the filesystem,
+the plugin would "tell" the storage interface it wanted a file in a particular place with specified content.
+The storage interface would be responsible for recording this request, and for making it happen.
+And because the storage interface is a logging middleware for any of these actions,
+if a particular effect is no longer desired, the storage has a record of it previously being ensured
+and can be responsible for later cleanup.
+
+Pros:
+  * storage as an interface for ensuring side-effect is fairly straight-forward
+  * plugins become easy to test because their side-effects are already contained to easy to swap interfaces
+
+Cons:
+  * the storage interface will grow bigger with each plugin's unique need
+  * the abundant use of interfaces may make it more challenging to trace what's happening
+  * a plugin's true implementation is spread across multiple packages
+  * not obvious for how to handle dropped bits of configuration
+  * may be challenging to enable atomicity down the road
