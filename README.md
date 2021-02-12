@@ -7,46 +7,39 @@ There are no guarantees of any functionality or stability at this time.
 
 ## Current feature set
 
-* connect to sqlite (not yet used)
-* parse configuration file
-
-
-**File Symlinking**:
-* ensure symlinks within configuration file
-
 **Neovim Support**:
 * clone (neo)vim plugins into a specified directory
-* install vim-plug
 * generate `init.vim` from specified plugins and additional config
+* install vim-plug & install specified plugins
 
 **Brew Support**:
 * supports taps, ordinary packages, and casks
 * cleans up packages no longer specified
 
-## Intended feature set
+**Zsh Support**:
+* plugins using zinit
+* configuring history size and history sharing
+* variables
+* aliases
+* functions
+* arbitrary .zshrc prefixes & suffixes
 
-* garbage collection: files created by a previous invocation but no longer preset in config are deleted
-  - in this sense, the resulting system should not be "workable" if a depedency is removed from config
-  - it also means that settle can clean-up after itself, removing crumbs from previous runs
-* multi-platform package management
-* zsh is configurable with plugins
+**File Symlinking**
+* symlink files using relative or absolute paths
+
+### Run history
+
+After a successful run, a copy of that run's `settle.yaml` is backed up to `~/.local/share/settle`.
+This enables a relatively easy process to restore a prior good config.
+
+## Future features
+
 * support across macos and at least a single linux distro (one of arch, fedora, or solus)
-* make bootstrapping easy (e.g. `settle init github.com/<user>/<dofiles-repo>`)
-* config "profiles" by allowing config to reference other config
-
-## Stretch goals
-
-* a way to represent `$HOME` whether as a singular allowed substitution or via full template support
-* support for retrieving secure tokens (e.g. github token or ssh keys)
-
+* simplified bootstrapping (e.g. `settle init github.com/<user>/<dofiles-repo>`)
+* config "profiles" by allowing config to reference other config (i.e. `include`)
+* simplified rollbacks (e.g. `settle history` and `settle rollback <time>`)
 
 ### TODOs for existing features
-
-#### Files
-
-* make the whole process atomic (google may have a library for this, chezmoi may use it)
-* register established mappings in db
-* garbage collect for db contents no longer in mapping
 
 ### TODOs for docs
 
@@ -57,3 +50,4 @@ There are no guarantees of any functionality or stability at this time.
 
 * add linting
 * add tests
+* executable distribution

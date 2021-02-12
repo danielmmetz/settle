@@ -1,75 +1,59 @@
-package brew
+package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"strings"
-
-	"github.com/danielmmetz/settle/pkg/log"
-	"github.com/danielmmetz/settle/pkg/store"
-	"gopkg.in/yaml.v2"
 )
 
 type Brew struct {
-	Taps  Taps
-	Pkgs  Pkgs
-	Casks Casks
+	Taps  Taps  `json:"taps"`
+	Pkgs  Pkgs  `json:"pkgs"`
+	Casks Casks `json:"casks"`
 }
 
-func (b *Brew) Ensure(ctx context.Context, logger log.Log, store store.Store) error {
+func (b *Brew) Ensure(ctx context.Context) error {
 	if b == nil {
 		return nil
-	}
-
-	previous, err := store.Content(ctx, "Brewfile")
-	if err == nil {
-		var parsedPrev Brew
-		if err := yaml.Unmarshal([]byte(previous), &parsedPrev); err == nil {
-			if b.equal(parsedPrev) {
-				logger.Debug("skipping brew ensure: no changes")
-				return nil
-			} else {
-				logger.Debug("brew: cache miss: detected changes since last run")
-			}
-		} else {
-			logger.Debug("brew: cache miss: error unmarshaling previous run from store: %w", err)
-		}
-	} else {
-		logger.Debug("brew: cache miss: error checking cache: %w", err)
 	}
 
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
 		return fmt.Errorf("error creating temporary Brewfile: %w", err)
 	}
-	if _, err := f.WriteString(b.brewfile()); err != nil {
+	fmt.Println("writing temporary Brewfile to:", f.Name())
+	if _, err := f.WriteString(b.String()); err != nil {
 		return err
 	}
-	logger.Debug("wrote temporary Brewfile to: %s", f.Name())
 
-	logger.Info("installing packages with `brew bundle`")
+	fmt.Println("installing packages with `brew bundle`")
 	installCmd := exec.CommandContext(ctx, "brew", "bundle", "--file", f.Name())
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("error running `brew bundle`: %w", err)
+	if output, err := installCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error running `brew bundle`: %w\n%s", err, string(output))
 	}
-	logger.Info("cleaning up orphan packages with `brew bundle cleanup`")
+	fmt.Println("cleaning up orphan packages with `brew bundle cleanup`")
 	cleanupCmd := exec.CommandContext(ctx, "brew", "bundle", "cleanup", "--force", "--file", f.Name())
-	if err := cleanupCmd.Run(); err != nil {
-		return fmt.Errorf("error running `brew bundle cleanup`: %w", err)
-	}
-
-	content, err := yaml.Marshal(b)
-	if err != nil {
-		logger.Info("error marshaling Brewfile for storage: %w", err)
-		return nil
-	}
-	logger.Debug("writing Brewfile to store")
-	if err := store.SetContent(ctx, "Brewfile", string(content)); err != nil {
-		logger.Info("error writing Brewfile to store: %w", err)
+	if output, err := cleanupCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error running `brew bundle cleanup`: %w\n%s", err, string(output))
 	}
 	return nil
+}
+
+func (b *Brew) String() string {
+	var lines []string
+	for _, tap := range b.Taps {
+		lines = append(lines, tap.String())
+	}
+	for _, pkg := range b.Pkgs {
+		lines = append(lines, pkg.String())
+	}
+	for _, cask := range b.Casks {
+		lines = append(lines, cask.String())
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (b *Brew) equal(other Brew) bool {
@@ -83,20 +67,6 @@ func (b *Brew) equal(other Brew) bool {
 		return false
 	}
 	return true
-}
-
-func (b *Brew) brewfile() string {
-	var lines []string
-	for _, tap := range b.Taps {
-		lines = append(lines, tap.String())
-	}
-	for _, pkg := range b.Pkgs {
-		lines = append(lines, pkg.String())
-	}
-	for _, cask := range b.Casks {
-		lines = append(lines, cask.String())
-	}
-	return strings.Join(lines, "\n")
 }
 
 type Taps []Tap
@@ -118,9 +88,9 @@ func (t Taps) equal(other Taps) bool {
 	return true
 }
 
-func (t *Taps) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (t *Taps) UnmarshalJSON(b []byte) error {
 	var intermediary []Tap
-	if err := unmarshal(&intermediary); err != nil {
+	if err := json.Unmarshal(b, &intermediary); err != nil {
 		return err
 	}
 	seen := map[string]bool{}
@@ -157,9 +127,9 @@ func (p Pkgs) equal(other Pkgs) bool {
 	return true
 }
 
-func (p *Pkgs) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (p *Pkgs) UnmarshalJSON(b []byte) error {
 	var intermediary []Pkg
-	if err := unmarshal(&intermediary); err != nil {
+	if err := json.Unmarshal(b, &intermediary); err != nil {
 		return err
 	}
 	seen := map[string]bool{}
@@ -174,8 +144,8 @@ func (p *Pkgs) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 type Pkg struct {
-	Name string
-	Args []string
+	Name string   `json:"name"`
+	Args []string `json:"args,omitempty"`
 }
 
 func (p Pkg) String() string {
@@ -209,9 +179,9 @@ func (c Casks) equal(other Casks) bool {
 	return true
 }
 
-func (t *Casks) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (t *Casks) UnmarshalJSON(b []byte) error {
 	var intermediary []Cask
-	if err := unmarshal(&intermediary); err != nil {
+	if err := json.Unmarshal(b, &intermediary); err != nil {
 		return err
 	}
 	seen := map[string]bool{}

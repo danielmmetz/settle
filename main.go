@@ -2,113 +2,106 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
 
-	"github.com/danielmmetz/settle/pkg/brew"
-	"github.com/danielmmetz/settle/pkg/files"
-	"github.com/danielmmetz/settle/pkg/log"
-	"github.com/danielmmetz/settle/pkg/nvim"
-	"github.com/danielmmetz/settle/pkg/store"
-	_ "github.com/mattn/go-sqlite3"
-	"gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 )
 
-func main() {
-	fVerbose := flag.Bool("verbose", false, "enable verbose logging")
-	fDumpConfig := flag.Bool("dump-config", false, "pretty print config then exit without applying changes")
-	fSkipBrew := flag.Bool("skip-brew", false, "skip applying brew changes")
+func mainE(ctx context.Context) error {
+	dumpConfig := flag.String("dump-config", "", "if specified, prints the parsed config file in the specified format (json or yaml) then exits")
 	flag.Parse()
 
-	var logger log.Log
-	if *fVerbose {
-		logger.Level = log.LevelDebug
-	}
-
-	db, err := sql.Open("sqlite3", "inventory.db")
+	configBytes, err := ioutil.ReadFile("settle.yaml")
 	if err != nil {
-		logger.Fatal("error opening db: %v", err)
+		return fmt.Errorf("error reading settle.yaml: %w", err)
 	}
-	defer db.Close()
-
-	ctx := context.Background()
-	e := ensurer{log: logger, store: store.New(db)}
-	if err := e.loadConfig(*fSkipBrew); err != nil {
-		logger.Fatal("error loading config: %v", err)
-	}
-	if *fDumpConfig {
-		logger.Info(e.dumpConfig())
-		os.Exit(0)
+	var c config
+	if err := yaml.Unmarshal(configBytes, &c); err != nil {
+		return fmt.Errorf("error parsing config file: %w", err)
 	}
 
-	if err := e.Ensure(ctx); err != nil {
-		logger.Fatal("error applying config: %v", err)
+	if *dumpConfig != "" {
+		var bDump []byte
+		var err error
+		switch *dumpConfig {
+		case "json":
+			bDump, err = json.MarshalIndent(c, "", "  ")
+		case "yaml":
+			bDump, err = yaml.Marshal(c)
+		default:
+			return fmt.Errorf(`invalid dump-config value specified: expected "json" or "yaml"`)
+		}
+		if err != nil {
+			return fmt.Errorf("error marshaling config: %w", err)
+		}
+		fmt.Println(string(bDump))
+		return nil
 	}
-}
 
-func (e *ensurer) loadConfig(skipBrew bool) error {
-	bytes, err := ioutil.ReadFile("settle.yaml")
+	if err := c.Ensure(ctx); err != nil {
+		return err
+	}
+
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("error loading settle.yaml: %w", err)
+		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
-	var config struct {
-		Files files.Files
-		Nvim  nvim.Nvim
-		Brew  *brew.Brew
-	}
-	if err = yaml.Unmarshal(bytes, &config); err != nil {
-		return err
-	}
-
-	e.files = config.Files
-	e.nvim = config.Nvim
-	if !skipBrew {
-		e.brew = config.Brew
-	}
-	return err
-}
-
-type ensurer struct {
-	log   log.Log
-	store store.Store
-	files files.Files
-	nvim  nvim.Nvim
-	brew  *brew.Brew
-}
-
-func (e *ensurer) Ensure(ctx context.Context) error {
-	if err := e.store.Ensure(ctx); err != nil {
-		return fmt.Errorf("error ensuring table: %w", err)
-	}
-	if err := e.files.Ensure(ctx, e.log, e.store); err != nil {
-		return err
-	}
-	if err := e.nvim.Ensure(ctx, e.log, e.store); err != nil {
-		return err
-	}
-	if err := e.brew.Ensure(ctx, e.log, e.store); err != nil {
-		return err
-	}
-	if err := e.store.Cleanup(); err != nil {
-		return fmt.Errorf("error during garbage collection: %w", err)
+	xdgDataDir := filepath.Join(home, ".local", "share")
+	_ = os.MkdirAll(filepath.Join(xdgDataDir, "settle"), 0755)
+	err = ioutil.WriteFile(
+		filepath.Join(home, ".local", "share", "settle", fmt.Sprintf("%s.yaml", time.Now().Local().Format("2006-01-02 15:04:05"))),
+		configBytes,
+		0644,
+	)
+	if err != nil {
+		return fmt.Errorf("error writing settle.yaml copy: %w", err)
 	}
 	return nil
 }
 
-func (e *ensurer) dumpConfig() string {
-	c := struct {
-		Files files.Files
-		Nvim  nvim.Nvim
-		Brew  *brew.Brew
-	}{
-		Files: e.files,
-		Nvim:  e.nvim,
-		Brew:  e.brew,
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		cancel()
+		<-sigs
+		os.Exit(1)
+	}()
+	if err := mainE(ctx); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	pretty, _ := json.MarshalIndent(c, "", "  ")
-	return string(pretty)
+}
+
+type config struct {
+	Files Files `json:"files"`
+	Brew  Brew  `json:"brew"`
+	Nvim  Nvim  `json:"nvim"`
+	Zsh   Zsh   `json:"zsh"`
+}
+
+func (c config) Ensure(ctx context.Context) error {
+	if err := c.Files.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring files: %w", err)
+	}
+	if err := c.Brew.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring brew: %w", err)
+	}
+	if err := c.Nvim.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring nvim: %w", err)
+	}
+	if err := c.Zsh.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring zsh: %w", err)
+	}
+	return nil
 }

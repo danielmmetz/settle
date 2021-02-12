@@ -1,4 +1,4 @@
-package nvim
+package main
 
 import (
 	"context"
@@ -7,35 +7,28 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/danielmmetz/settle/pkg/log"
-	"github.com/danielmmetz/settle/pkg/store"
-	"github.com/go-git/go-git/v5"
-	"golang.org/x/sync/errgroup"
 )
 
 type Nvim struct {
-	PluginDir string `yaml:"plugin_dir"`
-	Plugins   []Plugin
-	Config    NvimConfig
+	PluginDir string     `json:"plugin_dir"`
+	Plugins   []Plugin   `json:"plugins"`
+	Config    NvimConfig `json:"config"`
 }
 
-func (v Nvim) Ensure(ctx context.Context, logger log.Log, store store.Store) error {
-	if err := v.ensureVimPlug(ctx, logger, store); err != nil {
+func (v Nvim) Ensure(ctx context.Context) error {
+	if err := v.ensureVimPlug(ctx); err != nil {
 		return fmt.Errorf("error ensuring vim-plug: %w", err)
 	}
-	var wg errgroup.Group
-	for _, plugin := range v.Plugins {
-		plugin := plugin
-		wg.Go(func() error { return v.ensurePlugin(ctx, logger, store, plugin) })
-	}
-	if err := wg.Wait(); err != nil {
-		return fmt.Errorf("error ensuring vim plugins: %w", err)
-	}
-	if err := v.ensureInitVim(logger, store); err != nil {
+	if err := v.ensureInitVim(); err != nil {
 		return fmt.Errorf("error ensuring init.vim: %w", err)
+	}
+	fmt.Println("installing neovim plugins")
+	installCmd := exec.CommandContext(ctx, "nvim", "--headless", "+PlugInstall", "+qa")
+	if output, err := installCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error running `nvim --headless +PlugInstall +qa`: %w\n%s", err, string(output))
 	}
 	return nil
 }
@@ -44,7 +37,7 @@ const (
 	vimPlugURL = "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
 )
 
-func (v Nvim) ensureVimPlug(ctx context.Context, logger log.Log, store store.Store) error {
+func (v Nvim) ensureVimPlug(ctx context.Context) error {
 	if len(v.Plugins) == 0 {
 		return nil
 	}
@@ -55,15 +48,15 @@ func (v Nvim) ensureVimPlug(ctx context.Context, logger log.Log, store store.Sto
 	}
 	dstPath := filepath.Join(home, ".local", "share", "nvim", "site", "autoload", "plug.vim")
 
-	_, err = store.Stat(dstPath)
+	_, err = os.Stat(dstPath)
 	if err == nil {
-		logger.Debug("skipping vim-plug install: already present")
+		fmt.Println("skipping vim-plug install: already present")
 		return nil // file already exists
 	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	logger.Info("installing vim-plug")
+	fmt.Println("installing vim-plug")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, vimPlugURL, nil)
 	if err != nil {
 		return err
@@ -77,33 +70,13 @@ func (v Nvim) ensureVimPlug(ctx context.Context, logger log.Log, store store.Sto
 	if err != nil {
 		return err
 	}
-	if err := store.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 		return err
 	}
-	return store.WriteFile(ctx, dstPath, content, 0755)
+	return ioutil.WriteFile(dstPath, content, 0755)
 }
 
-func (v Nvim) ensurePlugin(ctx context.Context, logger log.Log, store store.Store, p Plugin) error {
-	dst := v.destDir(p)
-	_, err := git.PlainOpen(dst)
-	if err == git.ErrRepositoryNotExists {
-		// do nothing
-	} else if err != nil {
-		return fmt.Errorf("unable to check for existing repo for %v: %w", p, err)
-	} else if err == nil {
-		logger.Debug("repo exists, skipping clone for %v", p)
-		return nil
-	}
-
-	logger.Info("cloning repo %v into %s", p, dst)
-	_, err = store.GitClone(ctx, dst, &git.CloneOptions{
-		URL:   fmt.Sprintf("https://github.com/%s/%s.git", p.Owner, p.Repo),
-		Depth: 1,
-	})
-	return err
-}
-
-func (v Nvim) ensureInitVim(logger log.Log, store store.Store) error {
+func (v Nvim) ensureInitVim() error {
 	if len(v.Plugins) == 0 && v.Config == "" {
 		return nil
 	}
@@ -112,7 +85,7 @@ func (v Nvim) ensureInitVim(logger log.Log, store store.Store) error {
 		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
 	cfgPath := filepath.Join(home, ".config", "nvim", "init.vim")
-	logger.Info("writing vim config to %s", cfgPath)
+	fmt.Println("writing vim config to", cfgPath)
 	return ioutil.WriteFile(cfgPath, []byte(v.initVim()), 0755)
 }
 
@@ -134,8 +107,8 @@ func (v Nvim) initVim() string {
 }
 
 type Plugin struct {
-	Owner string
-	Repo  string
+	Owner string `json:"owner"`
+	Repo  string `json:"repo"`
 }
 
 func (p Plugin) toVimPlug() string {
@@ -146,9 +119,9 @@ func (p Plugin) String() string {
 	return fmt.Sprintf("%s/%s", p.Owner, p.Repo)
 }
 
-func (p *Plugin) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (p *Plugin) UnmarshalJSON(b []byte) error {
 	var intermediary string
-	if err := unmarshal(&intermediary); err != nil {
+	if err := json.Unmarshal(b, &intermediary); err != nil {
 		return err
 	}
 	components := strings.Split(intermediary, "/")
@@ -164,7 +137,7 @@ type NvimConfig string
 
 func (c NvimConfig) MarshalJSON() ([]byte, error) {
 	if len(c) > 0 {
-		return json.Marshal("(present but omitted)")
+		return json.Marshal(`"(present but omitted)"`)
 	}
-	return []byte("(empty)"), nil
+	return []byte(`"(empty)"`), nil
 }
