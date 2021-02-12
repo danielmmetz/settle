@@ -5,6 +5,9 @@ Settle is a dotfiles manager. Configure `settle.yaml`, run `settle`, and be on y
 Please note that settle is in its very early development.
 There are no guarantees of any functionality or stability at this time.
 
+See [my personal settle.yaml](https://github.com/danielmmetz/dotfiles/blob/master/settle.yaml)
+for an example config.
+
 ## Current feature set
 
 **Neovim Support**:
