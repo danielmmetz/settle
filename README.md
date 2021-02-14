@@ -11,7 +11,6 @@ for an example config.
 ## Current feature set
 
 **Neovim Support**:
-* clone (neo)vim plugins into a specified directory
 * generate `init.vim` from specified plugins and additional config
 * install vim-plug & install specified plugins
 
