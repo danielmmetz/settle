@@ -132,6 +132,7 @@ func main() {
 type config struct {
 	Files *Files `json:"files"`
 	Brew  *Brew  `json:"brew"`
+	Apt   *Apt   `json:"apt"`
 	Nvim  *Nvim  `json:"nvim"`
 	Zsh   *Zsh   `json:"zsh"`
 }
