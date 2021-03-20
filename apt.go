@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
 type Apt []string
@@ -14,8 +13,10 @@ func (a *Apt) Ensure(ctx context.Context) error {
 		return nil
 	}
 
+	cmd := []string{"apt", "install"}
+	cmd = append(cmd, *a...)
 	fmt.Println("installing packages with `sudo apt install`")
-	installCmd := exec.CommandContext(ctx, "sudo", "apt", "install", strings.Join(*a, " "))
+	installCmd := exec.CommandContext(ctx, "sudo", cmd...)
 	if output, err := installCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("error running `sudo apt install`: %w\n%s", err, string(output))
 	}
