@@ -84,10 +84,10 @@ func main() {
 }
 
 type config struct {
-	Files Files `json:"files"`
-	Brew  Brew  `json:"brew"`
-	Nvim  Nvim  `json:"nvim"`
-	Zsh   Zsh   `json:"zsh"`
+	Files *Files `json:"files"`
+	Brew  *Brew  `json:"brew"`
+	Nvim  *Nvim  `json:"nvim"`
+	Zsh   *Zsh   `json:"zsh"`
 }
 
 func (c config) Ensure(ctx context.Context) error {
