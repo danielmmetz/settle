@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -16,22 +17,58 @@ import (
 )
 
 func mainE(ctx context.Context) error {
-	dumpConfig := flag.String("dump-config", "", "if specified, prints the parsed config file in the specified format (json or yaml) then exits")
+	var (
+		dumpConfig string
+		configPath string
+	)
+	flag.StringVar(&dumpConfig, "dump-config", "", "if specified, prints the parsed config file in the specified format (json or yaml) then exits")
+	flag.StringVar(&configPath, "config", "", "if specified, uses config file at given path (default: previous value, then settle.yaml)")
 	flag.Parse()
 
-	configBytes, err := ioutil.ReadFile("settle.yaml")
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("error reading settle.yaml: %w", err)
+		return fmt.Errorf("unable to determine home dir: %w", err)
+	}
+	if configPath == "" {
+		settingsPath := filepath.Join(home, ".config", "settle", "settings.yaml")
+		b, err := ioutil.ReadFile(settingsPath)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("error reading %s: %w", settingsPath, err)
+		}
+		if err == nil {
+			var s settings
+			if err := yaml.Unmarshal(b, &s); err != nil {
+				return fmt.Errorf("error parsing %s: %w", settingsPath, err)
+			}
+			configPath = s.ConfigPath
+		}
+		if configPath == "" {
+			configPath = "settle.yaml"
+		}
+	}
+
+	absConfigPath, err := filepath.Abs(configPath)
+	if err != nil {
+		return fmt.Errorf("error determing absolute path from %s: %w", configPath, err)
+	}
+	configDir := filepath.Dir(absConfigPath)
+	if err := os.Chdir(configDir); err != nil {
+		return fmt.Errorf("error changing directory to %s: %w", configDir, err)
+	}
+
+	configBytes, err := ioutil.ReadFile(absConfigPath)
+	if err != nil {
+		return fmt.Errorf("error reading config file %s: %w", absConfigPath, err)
 	}
 	var c config
 	if err := yaml.Unmarshal(configBytes, &c); err != nil {
 		return fmt.Errorf("error parsing config file: %w", err)
 	}
 
-	if *dumpConfig != "" {
+	if dumpConfig != "" {
 		var bDump []byte
 		var err error
-		switch *dumpConfig {
+		switch dumpConfig {
 		case "json":
 			bDump, err = json.MarshalIndent(c, "", "  ")
 		case "yaml":
@@ -50,9 +87,18 @@ func mainE(ctx context.Context) error {
 		return err
 	}
 
-	home, err := os.UserHomeDir()
+	settingsBytes, err := yaml.Marshal(settings{ConfigPath: absConfigPath})
 	if err != nil {
-		return fmt.Errorf("unable to determine home dir: %w", err)
+		return fmt.Errorf("error marshaling contents for settings.yaml: %w", err)
+	}
+	_ = os.MkdirAll(filepath.Join(home, ".config", "settle"), 0755)
+	err = ioutil.WriteFile(
+		filepath.Join(home, ".config", "settle", "settings.yaml"),
+		settingsBytes,
+		0644,
+	)
+	if err != nil {
+		return fmt.Errorf("error writing settings.yaml: %w", err)
 	}
 	xdgDataDir := filepath.Join(home, ".local", "share")
 	_ = os.MkdirAll(filepath.Join(xdgDataDir, "settle"), 0755)
@@ -104,4 +150,8 @@ func (c config) Ensure(ctx context.Context) error {
 		return fmt.Errorf("error ensuring zsh: %w", err)
 	}
 	return nil
+}
+
+type settings struct {
+	ConfigPath string `json:"configPath"`
 }
