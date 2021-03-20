@@ -132,6 +132,7 @@ func main() {
 type config struct {
 	Files *Files `json:"files"`
 	Brew  *Brew  `json:"brew"`
+	Apt   *Apt   `json:"apt"`
 	Nvim  *Nvim  `json:"nvim"`
 	Zsh   *Zsh   `json:"zsh"`
 }
@@ -139,6 +140,9 @@ type config struct {
 func (c config) Ensure(ctx context.Context) error {
 	if err := c.Files.Ensure(ctx); err != nil {
 		return fmt.Errorf("error ensuring files: %w", err)
+	}
+	if err := c.Apt.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring apt: %w", err)
 	}
 	if err := c.Brew.Ensure(ctx); err != nil {
 		return fmt.Errorf("error ensuring brew: %w", err)
