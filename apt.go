@@ -13,7 +13,7 @@ func (a *Apt) Ensure(ctx context.Context) error {
 		return nil
 	}
 
-	cmd := []string{"apt", "install"}
+	cmd := []string{"apt", "install", "-y"}
 	cmd = append(cmd, *a...)
 	fmt.Println("installing packages with `sudo apt install`")
 	installCmd := exec.CommandContext(ctx, "sudo", cmd...)
