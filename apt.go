@@ -22,7 +22,7 @@ func (a *Apt) Ensure(ctx context.Context) error {
 	}
 
 	fmt.Println("cleaning up orphan packages with `sudo apt autoremove`")
-	cleanupCmd := exec.CommandContext(ctx, "sudo", "apt", "autoremove")
+	cleanupCmd := exec.CommandContext(ctx, "sudo", "apt", "autoremove", "-y")
 	if output, err := cleanupCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("error running `sudo apt autoremove`: %w\n%s", err, string(output))
 	}
