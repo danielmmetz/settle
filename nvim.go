@@ -85,6 +85,9 @@ func (v Nvim) ensureInitVim() error {
 		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
 	cfgPath := filepath.Join(home, ".config", "nvim", "init.vim")
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0755); err != nil {
+		return fmt.Errorf("error making intermediate directories for %s: %w", cfgPath, err)
+	}
 	fmt.Println("writing vim config to", cfgPath)
 	return ioutil.WriteFile(cfgPath, []byte(v.initVim()), 0755)
 }

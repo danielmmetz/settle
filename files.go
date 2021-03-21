@@ -34,6 +34,9 @@ func (f Files) Ensure(ctx context.Context) error {
 				return err
 			}
 		}
+		if err := os.MkdirAll(filepath.Dir(m.Dst), 0755); err != nil {
+			return fmt.Errorf("error making intermediate directories for %s: %w", m.Dst, err)
+		}
 		fmt.Printf("symlinking %s to %s\n", m.Src, m.Dst)
 		if err := os.Symlink(m.Src, m.Dst); err != nil {
 			return fmt.Errorf("error writing symlink from %s to %s: %w", m.Src, m.Dst, err)
