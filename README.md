@@ -14,7 +14,7 @@ for an example config.
 * generate `init.vim` from specified plugins and additional config
 * install vim-plug & install specified plugins
 
-** Apt Support**:
+**Apt Support**:
 * supports installing packages
 * runs autoremove
 
