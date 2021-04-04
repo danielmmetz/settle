@@ -14,6 +14,10 @@ for an example config.
 * generate `init.vim` from specified plugins and additional config
 * install vim-plug & install specified plugins
 
+** Apt Support**:
+* supports installing packages
+* runs autoremove
+
 **Brew Support**:
 * supports taps, ordinary packages, and casks
 * cleans up packages no longer specified
@@ -34,14 +38,20 @@ for an example config.
 After a successful run, a copy of that run's `settle.yaml` is backed up to `~/.local/share/settle`.
 This enables a relatively easy process to restore a prior good config.
 
+### Sticky config files
+
+After a successful run, `settle` remembers the config file it used.
+When run without specifying a `--config` argument,
+`settle` will default to using the path to the last successfully applied config file.
+
+This allows users to update and re-apply their config without needing to worry about their working directory,
+and allows a user to more easily maintain multiple config files in a single directory.
+
 ## Future features
 
-* support across macos and at least a single linux distro (one of arch, fedora, or solus)
 * simplified bootstrapping (e.g. `settle init github.com/<user>/<dofiles-repo>`)
-* config "profiles" by allowing config to reference other config (i.e. `include`)
+* modular config by allowing config files to reference other config (i.e. `include`)
 * simplified rollbacks (e.g. `settle history` and `settle rollback <time>`)
-
-### TODOs for existing features
 
 ### TODOs for docs
 
@@ -52,4 +62,3 @@ This enables a relatively easy process to restore a prior good config.
 
 * add linting
 * add tests
-* executable distribution
