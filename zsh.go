@@ -13,8 +13,11 @@ import (
 type Zsh struct {
 	Zinit   []string `json:"zinit"`
 	History struct {
-		Size         int  `json:"size"`
-		ShareHistory bool `json:"share_history"`
+		Size          int  `json:"size"`
+		ShareHistory  bool `json:"share_history"`
+		IncAppend     bool `json:"inc_append"`
+		IgnoreAllDups bool `json:"ignore_all_dups"`
+		IgnoreSpace   bool `json:"ignore_space"`
 	} `json:"history"`
 	Variables   []KV   `json:"variables"`
 	Aliases     []KV   `json:"aliases"`
@@ -89,9 +92,19 @@ func (z Zsh) String() string {
 	// history
 	if z.History.Size != 0 {
 		sb.WriteString(fmt.Sprintf("HISTSIZE=%d\n", z.History.Size))
+		sb.WriteString(fmt.Sprintf("SAVEHIST=%d\n", z.History.Size))
 	}
 	if z.History.ShareHistory {
 		sb.WriteString("setopt SHARE_HISTORY\n")
+	}
+	if z.History.IncAppend {
+		sb.WriteString("setopt INC_APPEND_HISTORY\n")
+	}
+	if z.History.IgnoreAllDups {
+		sb.WriteString("setopt HIST_IGNORE_ALL_DUPS\n")
+	}
+	if z.History.IgnoreSpace {
+		sb.WriteString("setopt HIST_IGNORE_SPACE\n")
 	}
 	sb.WriteString("\n")
 
