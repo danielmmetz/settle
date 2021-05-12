@@ -18,7 +18,11 @@ type Nvim struct {
 	Config    NvimConfig `json:"config"`
 }
 
-func (v Nvim) Ensure(ctx context.Context) error {
+func (v *Nvim) Ensure(ctx context.Context) error {
+	if v == nil {
+		return nil
+	}
+
 	if err := v.ensureVimPlug(ctx); err != nil {
 		return fmt.Errorf("error ensuring vim-plug: %w", err)
 	}
@@ -37,7 +41,7 @@ const (
 	vimPlugURL = "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
 )
 
-func (v Nvim) ensureVimPlug(ctx context.Context) error {
+func (v *Nvim) ensureVimPlug(ctx context.Context) error {
 	if len(v.Plugins) == 0 {
 		return nil
 	}
@@ -76,7 +80,7 @@ func (v Nvim) ensureVimPlug(ctx context.Context) error {
 	return ioutil.WriteFile(dstPath, content, 0755)
 }
 
-func (v Nvim) ensureInitVim() error {
+func (v *Nvim) ensureInitVim() error {
 	if len(v.Plugins) == 0 && v.Config == "" {
 		return nil
 	}
@@ -92,11 +96,11 @@ func (v Nvim) ensureInitVim() error {
 	return ioutil.WriteFile(cfgPath, []byte(v.initVim()), 0755)
 }
 
-func (v Nvim) destDir(p Plugin) string {
+func (v *Nvim) destDir(p Plugin) string {
 	return fmt.Sprintf("%s/%s", v.PluginDir, p.Repo)
 }
 
-func (v Nvim) initVim() string {
+func (v *Nvim) initVim() string {
 	var vimPlugLines []string
 	vimPlugLines = append(vimPlugLines, fmt.Sprintf("call plug#begin('%s')", v.PluginDir))
 	for _, plugin := range v.Plugins {

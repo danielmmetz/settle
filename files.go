@@ -17,8 +17,12 @@ type FileMapping struct {
 	Dst string `json:"dst"`
 }
 
-func (f Files) Ensure(ctx context.Context) error {
-	for _, m := range f {
+func (f *Files) Ensure(ctx context.Context) error {
+	if f == nil {
+		return nil
+	}
+
+	for _, m := range *f {
 		_, err := os.Lstat(m.Dst)
 		if errors.Is(err, os.ErrNotExist) {
 			// do nothing

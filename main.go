@@ -20,9 +20,11 @@ func mainE(ctx context.Context) error {
 	var (
 		dumpConfig string
 		configPath string
+		target     string
 	)
 	flag.StringVar(&dumpConfig, "dump-config", "", "if specified, prints the parsed config file in the specified format (json or yaml) then exits")
 	flag.StringVar(&configPath, "config", "", "if specified, uses config file at given path (default: previous value, then settle.yaml)")
+	flag.StringVar(&target, "target", "", "if specified, applies only specified stanza of the config")
 	flag.Parse()
 
 	home, err := os.UserHomeDir()
@@ -65,7 +67,20 @@ func mainE(ctx context.Context) error {
 		return fmt.Errorf("error parsing config file: %w", err)
 	}
 
+	var opts []option
+	switch target {
+	case "nvim":
+		opts = append(opts, withOnlyNvim())
+	case "":
+	default:
+		return fmt.Errorf("unsupported target specified: %s", target)
+	}
+
 	if dumpConfig != "" {
+		for _, o := range opts {
+			o(&c)
+		}
+
 		var bDump []byte
 		var err error
 		switch dumpConfig {
@@ -83,8 +98,13 @@ func mainE(ctx context.Context) error {
 		return nil
 	}
 
-	if err := c.Ensure(ctx); err != nil {
+	if err := c.Ensure(ctx, opts...); err != nil {
 		return err
+	}
+
+	if target != "" {
+		fmt.Println("skipping writing of settings.yaml and creating settle.yaml backup: non-zero target specified:", target)
+		return nil
 	}
 
 	settingsBytes, err := yaml.Marshal(settings{ConfigPath: absConfigPath})
@@ -137,7 +157,11 @@ type config struct {
 	Zsh   *Zsh   `json:"zsh"`
 }
 
-func (c config) Ensure(ctx context.Context) error {
+func (c *config) Ensure(ctx context.Context, opts ...option) error {
+	for _, o := range opts {
+		o(c)
+	}
+
 	if err := c.Files.Ensure(ctx); err != nil {
 		return fmt.Errorf("error ensuring files: %w", err)
 	}
@@ -158,4 +182,12 @@ func (c config) Ensure(ctx context.Context) error {
 
 type settings struct {
 	ConfigPath string `json:"configPath"`
+}
+
+type option func(c *config)
+
+func withOnlyNvim() option {
+	return func(c *config) {
+		*c = config{Nvim: c.Nvim}
+	}
 }

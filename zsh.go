@@ -31,7 +31,11 @@ type KV struct {
 	Value string `json:"value"`
 }
 
-func (z Zsh) Ensure(ctx context.Context) error {
+func (z *Zsh) Ensure(ctx context.Context) error {
+	if z == nil {
+		return nil
+	}
+
 	if err := z.ensureZinit(ctx); err != nil {
 		return fmt.Errorf("error ensuring zinit: %w", err)
 	}
@@ -50,7 +54,7 @@ const (
 	zinitURL = "https://raw.githubusercontent.com/zdharma/zinit/master/zinit.zsh"
 )
 
-func (z Zsh) ensureZinit(ctx context.Context) error {
+func (z *Zsh) ensureZinit(ctx context.Context) error {
 	if len(z.Zinit) == 0 {
 		return nil
 	}
@@ -76,7 +80,7 @@ func (z Zsh) ensureZinit(ctx context.Context) error {
 	return nil
 }
 
-func (z Zsh) String() string {
+func (z *Zsh) String() string {
 	var sb strings.Builder
 
 	// extra prefix
