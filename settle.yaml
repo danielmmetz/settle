@@ -1,0 +1,327 @@
+# This is an example config file.
+
+files:
+  - src: gitconfig
+    dst: ~/.gitconfig
+  - src: kitty.conf
+    dst: ~/.config/kitty/kitty.conf
+
+brew:
+  taps:
+    - homebrew/core
+    - homebrew/bundle
+    - homebrew/services
+    - homebrew/cask
+    - homebrew/cask-fonts
+    - homebrew/cask-versions
+    - neovim/neovim
+  pkgs:
+    - name: bandwhich
+    - name: bash
+    - name: bat
+    - name: coreutils
+    - name: ctags
+    - name: exa
+    - name: fasd
+    - name: fd
+    - name: fish
+    - name: fzf
+    - name: gh
+    - name: git
+    - name: graphviz  # needed for pprof web
+    - name: gron
+    - name: go
+    - name: golangci/tap/golangci-lint
+    - name: htop
+    - name: hub
+    - name: icdiff
+    - name: jq
+    - name: make
+    - name: moreutils
+    - name: ncdu
+    - name: neovim
+    - name: node
+    - name: openssl
+    - name: pandoc
+    - name: postgresql
+    - name: pre-commit
+    - name: python
+    - name: python-yq
+    - name: ranger
+    - name: rename
+    - name: ripgrep
+    - name: rsync
+    - name: ruby
+    - name: shellcheck
+    - name: shfmt
+    - name: skopeo
+    - name: speedtest-cli
+    - name: svn
+    - name: terraform
+    - name: the_silver_searcher
+    - name: tealdeer
+    - name: tmux
+    - name: tree
+    - name: unrar
+    - name: vim
+    - name: watch
+    - name: wget
+    - name: xsv
+    - name: yamllint
+    - name: zsh
+  casks:
+    - alfred
+    - appcleaner
+    - calibre
+    - discord
+    - docker
+    - dotnet
+    - font-source-code-pro
+    - font-source-code-pro-for-powerline
+    - kitty
+    - numi
+    - plex
+    - postman
+    - rectangle
+    - signal
+    - slack
+    - spotify
+    - steam
+    - the-unarchiver
+    - vlc
+
+zsh:
+  zinit:
+    - ice pick=async.zsh src=pure.zsh
+    - light sindresorhus/pure
+    - light zdharma/fast-syntax-highlighting
+    - snippet OMZ::plugins/fasd/fasd.plugin.zsh
+    - snippet OMZ::plugins/fzf/fzf.plugin.zsh
+  history:
+    size: 50000
+    share_history: true
+    inc_append: true
+    ignore_all_dups: true
+    ignore_space: true
+  variables:
+    - {name: DOTFILES, value: "$HOME/src/danielmmetz/dotfiles"}
+    - {name: EDITOR, value: "nvim"}
+    - {name: PATH, value: "$PATH:$HOME/go/bin:$HOME/bin"}
+    - {name: HOMEBREW_NO_AUTO_UPDATE, value: "1"}
+  aliases:
+    - {name: cat, value: "bat"}
+    - {name: la, value: "ls -la"}
+    - {name: ll, value: "ls -l"}
+    - {name: ls, value: "exa"}
+    - {name: vi, value: "nvim"}
+    - {name: vim, value: "nvim"}
+    - {name: vimrc, value: "nvim $DOTFILES/settle.yaml"}
+    - {name: zshrc, value: "nvim $DOTFILES/settle.yaml"}
+  extra_prefix: |
+    if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
+        echo "Installing DHARMA Initiative Plugin Manager (zdharma/zinit)…"
+        mkdir -p "$HOME/.zinit" && chmod g-rwX "$HOME/.zinit"
+        git clone https://github.com/zdharma/zinit "$HOME/.zinit/bin" && \
+            echo "Installation successful" || \
+            echo "The clone has failed."
+    fi
+
+    source "$HOME/.zinit/bin/zinit.zsh"
+    autoload -Uz _zinit
+    (( ${+_comps} )) && _comps[zinit]=_zinit
+  extra_suffix: |
+    if test -f ~/.credentials; then source $HOME/.credentials; fi
+
+nvim:
+  plugin_dir: /Users/dmetz/.vim/plugged
+  plugins:
+    # vim theming
+    - KeitaNakamura/neodark.vim
+    - vim-airline/vim-airline
+    - vim-airline/vim-airline-themes
+    # vim code navigation
+    - rafaqz/ranger.vim
+    - junegunn/fzf
+    - junegunn/fzf.vim
+    # vim editor ui
+    - mhinz/vim-signify
+    - neovim/nvim-lsp
+    - neovim/nvim-lspconfig
+    - nvim-lua/completion-nvim
+    # vim enhancements
+    - mhinz/vim-sayonara
+    - tpope/vim-abolish
+    - tpope/vim-commentary
+    - tpope/vim-fugitive
+    - tpope/vim-repeat
+    - tpope/vim-rhubarb
+    - tpope/vim-sensible
+    - tpope/vim-surround
+    - tpope/vim-unimpaired
+    # vim editing enhancements
+    - itchyny/vim-cursorword
+    - jiangmiao/auto-pairs
+    - ntpeters/vim-better-whitespace
+    - machakann/vim-swap
+    - wellle/targets.vim
+    - chrisbra/SudoEdit.vim
+    - AndrewRadev/splitjoin.vim
+    # vim language specific
+    - fatih/vim-go
+    - HerringtonDarkholme/yats.vim
+    - hashivim/vim-terraform
+  config: |
+    lua << EOF
+      lspconfig = require('lspconfig')
+      lspconfig.gopls.setup {
+        on_attach = require('completion').on_attach,
+        cmd = {"gopls", "serve"},
+        settings = {
+          gopls = {
+            analyses = {
+              unusedparams = true,
+            },
+            staticcheck = true,
+          },
+        },
+      }
+      function goimports(timeout_ms)
+        local context = { source = { organizeImports = true } }
+        vim.validate { context = { context, "t", true } }
+
+        local params = vim.lsp.util.make_range_params()
+        params.context = context
+
+        -- See the implementation of the textDocument/codeAction callback
+        -- (lua/vim/lsp/handler.lua) for how to do this properly.
+        local result = vim.lsp.buf_request_sync(0, "textDocument/codeAction", params, timeout_ms)
+        if not result or next(result) == nil then return end
+        local actions = result[1].result
+        if not actions then return end
+        local action = actions[1]
+
+        -- textDocument/codeAction can return either Command[] or CodeAction[]. If it
+        -- is a CodeAction, it can have either an edit, a command or both. Edits
+        -- should be executed first.
+        if action.edit or type(action.command) == "table" then
+          if action.edit then
+            vim.lsp.util.apply_workspace_edit(action.edit)
+          end
+          if type(action.command) == "table" then
+            vim.lsp.buf.execute_command(action.command)
+          end
+        else
+          vim.lsp.buf.execute_command(action)
+        end
+      end
+    EOF
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " augroups
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " not yet viable: see https://github.com/golang/go/issues/43735
+    " autocmd BufWritePre *.go lua vim.lsp.buf.formatting()
+    " autocmd BufWritePre *.go lua goimports(5000)
+    autocmd FileType go setlocal omnifunc=v:lua.vim.lsp.omnifunc
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " appearance / behavior
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    map <C-l> <silent>
+
+    colorscheme neodark
+
+    set autoread
+    set clipboard^=unnamed,unnamedplus
+    set cursorline
+    set visualbell
+    set mouse=a
+    set inccommand=nosplit
+
+    set nowrap
+    set number
+    set splitbelow
+    set splitright
+
+    set expandtab
+    set shiftwidth=4
+    set softtabstop=4
+    set smarttab
+    set tabstop=4
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " plugin overrides
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " airline
+    let g:airline#extensions#branch#enabled = 0
+    let g:airline#extensions#hunks#enabled = 0
+    let g:airline#extensions#tabline#enabled = 0
+    let g:airline#extensions#virtualenv#enabled = 0
+    let g:airline_powerline_fonts=1
+    let g:airline_theme='onedark'
+
+    " better whitespace
+    let g:better_whitespace_enabled = 0
+    let g:strip_whitelines_at_eof = 1
+    let g:strip_whitespace_confirm = 0
+    let g:strip_whitespace_on_save = 1
+
+    " fzf.vim
+    let g:fzf_preview_window = ""
+
+    " completion-nvim
+    let g:completion_trigger_keyword_length = 3
+    set completeopt=menuone,noinsert,noselect
+    set shortmess+=c
+
+    " vim-go
+    let g:go_fmt_command = "goimports"
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " misc key maps
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    nnoremap Y y$
+    nnoremap B ^
+    nnoremap E $
+    nnoremap <C-n> :noh<CR>
+    nnoremap j gj
+    nnoremap k gk
+
+    tnoremap <Esc> <C-\><C-n>
+
+    nnoremap <C-h> <C-w>h
+    nnoremap <C-j> <C-w>j
+    nnoremap <C-k> <C-w>k
+    nnoremap <C-l> <C-w>l
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " fzf
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    nnoremap <C-b> :Buffers<cr>
+    nnoremap <C-p> :GFiles<cr>
+    nnoremap <C-f> :Rg<cr>
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " neovim lsp
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    nmap <leader>r <cmd>lua vim.lsp.buf.rename()<CR>
+    nmap <silent> gd <cmd>lua vim.lsp.buf.definition()<CR>
+    nmap <silent> gi <cmd>lua vim.lsp.buf.implementation()<CR>
+    nmap <silent> gr <cmd>lua vim.lsp.buf.references()<CR>
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " ranger
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    command! Ranger call RangerEdit("edit")
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " sayonara
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    map <C-c> :Sayonara!<cr>
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " vim-swap
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    omap i, <Plug>(swap-textobject-i)
+    xmap i, <Plug>(swap-textobject-i)
+    omap a, <Plug>(swap-textobject-a)
+    xmap a, <Plug>(swap-textobject-a)
