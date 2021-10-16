@@ -54,7 +54,7 @@ and allows a user to more easily maintain multiple config files in a single dire
 
 ### TODOs for docs
 
-* add a "Why?" section
+* fabricate a legitimate-sounding reason why I made this, then add a "Why?" section
 * add examples
 
 ### For the project
