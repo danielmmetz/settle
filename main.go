@@ -71,6 +71,8 @@ func mainE(ctx context.Context) error {
 	switch target {
 	case "nvim":
 		opts = append(opts, withOnlyNvim())
+	case "zsh":
+		opts = append(opts, withOnlyZsh())
 	case "":
 	default:
 		return fmt.Errorf("unsupported target specified: %s", target)
@@ -189,5 +191,11 @@ type option func(c *config)
 func withOnlyNvim() option {
 	return func(c *config) {
 		*c = config{Nvim: c.Nvim}
+	}
+}
+
+func withOnlyZsh() option {
+	return func(c *config) {
+		*c = config{Zsh: c.Zsh}
 	}
 }
