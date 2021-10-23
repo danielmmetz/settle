@@ -95,6 +95,7 @@ func (z *Zsh) String() string {
 
 	// history
 	if z.History.Size != 0 {
+		sb.WriteString(fmt.Sprintf("HISTFILE=~/.zsh_history\n"))
 		sb.WriteString(fmt.Sprintf("HISTSIZE=%d\n", z.History.Size))
 		sb.WriteString(fmt.Sprintf("SAVEHIST=%d\n", z.History.Size))
 	}
