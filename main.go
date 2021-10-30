@@ -69,6 +69,8 @@ func mainE(ctx context.Context) error {
 
 	var opts []option
 	switch target {
+	case "files":
+		opts = append(opts, withOnlyFiles())
 	case "nvim":
 		opts = append(opts, withOnlyNvim())
 	case "zsh":
@@ -187,6 +189,12 @@ type settings struct {
 }
 
 type option func(c *config)
+
+func withOnlyFiles() option {
+	return func(c *config) {
+		*c = config{Files: c.Files}
+	}
+}
 
 func withOnlyNvim() option {
 	return func(c *config) {
