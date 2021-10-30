@@ -82,5 +82,8 @@ func expandTilde(path string) (string, error) {
 			components[i] = home
 		}
 	}
+	if strings.HasPrefix(path, "/") {
+		components = append([]string{"/"}, components...)
+	}
 	return filepath.Join(components...), nil
 }
