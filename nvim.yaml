@@ -1,0 +1,193 @@
+nvim:
+  plugin_dir: /Users/dmetz/.vim/plugged
+  plugins:
+    # vim theming
+    - KeitaNakamura/neodark.vim
+    - vim-airline/vim-airline
+    - vim-airline/vim-airline-themes
+    # vim code navigation
+    - rafaqz/ranger.vim
+    - junegunn/fzf
+    - junegunn/fzf.vim
+    # vim editor ui
+    - mhinz/vim-signify
+    - neovim/nvim-lsp
+    - neovim/nvim-lspconfig
+    - nvim-lua/completion-nvim
+    # vim enhancements
+    - mhinz/vim-sayonara
+    - tpope/vim-abolish
+    - tpope/vim-commentary
+    - tpope/vim-fugitive
+    - tpope/vim-repeat
+    - tpope/vim-rhubarb
+    - tpope/vim-sensible
+    - tpope/vim-surround
+    - tpope/vim-unimpaired
+    # vim editing enhancements
+    - itchyny/vim-cursorword
+    - jiangmiao/auto-pairs
+    - ntpeters/vim-better-whitespace
+    - machakann/vim-swap
+    - wellle/targets.vim
+    - chrisbra/SudoEdit.vim
+    - AndrewRadev/splitjoin.vim
+    # vim language specific
+    - fatih/vim-go
+    - HerringtonDarkholme/yats.vim
+    - hashivim/vim-terraform
+  config: |
+    lua << EOF
+      lspconfig = require('lspconfig')
+      lspconfig.gopls.setup {
+        on_attach = require('completion').on_attach,
+        cmd = {"gopls", "serve"},
+        settings = {
+          gopls = {
+            analyses = {
+              unusedparams = true,
+            },
+            staticcheck = true,
+          },
+        },
+      }
+      function goimports(timeout_ms)
+        local context = { source = { organizeImports = true } }
+        vim.validate { context = { context, "t", true } }
+
+        local params = vim.lsp.util.make_range_params()
+        params.context = context
+
+        -- See the implementation of the textDocument/codeAction callback
+        -- (lua/vim/lsp/handler.lua) for how to do this properly.
+        local result = vim.lsp.buf_request_sync(0, "textDocument/codeAction", params, timeout_ms)
+        if not result or next(result) == nil then return end
+        local actions = result[1].result
+        if not actions then return end
+        local action = actions[1]
+
+        -- textDocument/codeAction can return either Command[] or CodeAction[]. If it
+        -- is a CodeAction, it can have either an edit, a command or both. Edits
+        -- should be executed first.
+        if action.edit or type(action.command) == "table" then
+          if action.edit then
+            vim.lsp.util.apply_workspace_edit(action.edit)
+          end
+          if type(action.command) == "table" then
+            vim.lsp.buf.execute_command(action.command)
+          end
+        else
+          vim.lsp.buf.execute_command(action)
+        end
+      end
+    EOF
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " augroups
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " not yet viable: see https://github.com/golang/go/issues/43735
+    " autocmd BufWritePre *.go lua vim.lsp.buf.formatting()
+    " autocmd BufWritePre *.go lua goimports(5000)
+    autocmd FileType go setlocal omnifunc=v:lua.vim.lsp.omnifunc
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " appearance / behavior
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    map <C-l> <silent>
+
+    colorscheme neodark
+
+    set autoread
+    set clipboard^=unnamed,unnamedplus
+    set cursorline
+    set visualbell
+    set mouse=a
+    set inccommand=nosplit
+
+    set nowrap
+    set number
+    set splitbelow
+    set splitright
+
+    set expandtab
+    set shiftwidth=4
+    set softtabstop=4
+    set smarttab
+    set tabstop=4
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " plugin overrides
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " airline
+    let g:airline#extensions#branch#enabled = 0
+    let g:airline#extensions#hunks#enabled = 0
+    let g:airline#extensions#tabline#enabled = 0
+    let g:airline#extensions#virtualenv#enabled = 0
+    let g:airline_powerline_fonts=1
+    let g:airline_theme='onedark'
+
+    " better whitespace
+    let g:better_whitespace_enabled = 0
+    let g:strip_whitelines_at_eof = 1
+    let g:strip_whitespace_confirm = 0
+    let g:strip_whitespace_on_save = 1
+
+    " fzf.vim
+    let g:fzf_preview_window = ""
+
+    " completion-nvim
+    let g:completion_trigger_keyword_length = 3
+    set completeopt=menuone,noinsert,noselect
+    set shortmess+=c
+
+    " vim-go
+    let g:go_fmt_command = "goimports"
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " misc key maps
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    nnoremap Y y$
+    nnoremap B ^
+    nnoremap E $
+    nnoremap <C-n> :noh<CR>
+    nnoremap j gj
+    nnoremap k gk
+
+    tnoremap <Esc> <C-\><C-n>
+
+    nnoremap <C-h> <C-w>h
+    nnoremap <C-j> <C-w>j
+    nnoremap <C-k> <C-w>k
+    nnoremap <C-l> <C-w>l
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " fzf
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    nnoremap <C-b> :Buffers<cr>
+    nnoremap <C-p> :GFiles<cr>
+    nnoremap <C-f> :Rg<cr>
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " neovim lsp
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    nmap <leader>r <cmd>lua vim.lsp.buf.rename()<CR>
+    nmap <silent> gd <cmd>lua vim.lsp.buf.definition()<CR>
+    nmap <silent> gi <cmd>lua vim.lsp.buf.implementation()<CR>
+    nmap <silent> gr <cmd>lua vim.lsp.buf.references()<CR>
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " ranger
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    command! Ranger call RangerEdit("edit")
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " sayonara
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    map <C-c> :Sayonara!<cr>
+
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    " vim-swap
+    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    omap i, <Plug>(swap-textobject-i)
+    xmap i, <Plug>(swap-textobject-i)
+    omap a, <Plug>(swap-textobject-a)
+    xmap a, <Plug>(swap-textobject-a)

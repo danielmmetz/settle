@@ -161,6 +161,51 @@ type config struct {
 	Zsh   *Zsh   `json:"zsh"`
 }
 
+func (c *config) UnmarshalJSON(b []byte) error {
+	type clone struct {
+		Includes []string `json:"includes"`
+		Files    *Files   `json:"files"`
+		Brew     *Brew    `json:"brew"`
+		Apt      *Apt     `json:"apt"`
+		Nvim     *Nvim    `json:"nvim"`
+		Zsh      *Zsh     `json:"zsh"`
+	}
+	var original clone
+	if err := json.Unmarshal(b, &original); err != nil {
+		return err
+	}
+
+	var final config
+	for _, f := range original.Includes {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("error reading %s: %w", f, err)
+		}
+		if err := yaml.Unmarshal(b, &final); err != nil {
+			return fmt.Errorf("error unmarshaling %s: %w", f, err)
+		}
+	}
+
+	if original.Files != nil {
+		final.Files = original.Files
+	}
+	if original.Brew != nil {
+		final.Brew = original.Brew
+	}
+	if original.Apt != nil {
+		final.Apt = original.Apt
+	}
+	if original.Nvim != nil {
+		final.Nvim = original.Nvim
+	}
+	if original.Zsh != nil {
+		final.Zsh = original.Zsh
+	}
+	*c = final
+	return nil
+
+}
+
 func (c *config) Ensure(ctx context.Context, opts ...option) error {
 	for _, o := range opts {
 		o(c)
