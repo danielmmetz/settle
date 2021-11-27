@@ -18,6 +18,26 @@ type Nvim struct {
 	Config    NvimConfig `json:"config"`
 }
 
+func (v *Nvim) UnmarshalJSON(b []byte) error {
+	type clone struct {
+		PluginDir string     `json:"plugin_dir"`
+		Plugins   []Plugin   `json:"plugins"`
+		Config    NvimConfig `json:"config"`
+	}
+	var c clone
+	if err := json.Unmarshal(b, &c); err != nil {
+		return err
+	}
+	expandedPluginDir, err := expandTilde(c.PluginDir)
+	if err != nil {
+		return err
+	}
+	v.PluginDir = expandedPluginDir
+	v.Plugins = c.Plugins
+	v.Config = c.Config
+	return nil
+}
+
 func (v *Nvim) Ensure(ctx context.Context) error {
 	if v == nil {
 		return nil
