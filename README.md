@@ -32,6 +32,11 @@ See [here for an example config](./settle.yaml).
 **File Symlinking**
 * symlink files using relative or absolute paths
 
+**Includes**
+* enable modular config by means of _including_ other files into the main configuration
+  * resolution order is the listed files for inclusion (in-order), then content in the main config file.
+    The last definition wins. Stanzas are taken as all or nothing--no clever merging happens within stanzas.
+
 ### Run history
 
 After a successful run, a copy of that run's `settle.yaml` is backed up to `~/.local/share/settle`.
@@ -49,7 +54,6 @@ and allows a user to more easily maintain multiple config files in a single dire
 ## Future features
 
 * simplified bootstrapping (e.g. `settle init github.com/<user>/<dofiles-repo>`)
-* modular config by allowing config files to reference other config (i.e. `include`)
 * simplified rollbacks (e.g. `settle history` and `settle rollback <time>`)
 
 ### TODOs for docs
