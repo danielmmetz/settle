@@ -25,7 +25,7 @@ func (v *Nvim) Ensure(ctx context.Context) error {
 		return fmt.Errorf("error ensuring init.lua: %w", err)
 	}
 	fmt.Println("installing neovim plugins")
-	installCmd := exec.CommandContext(ctx, "nvim", "--headless", "+PaqSync", "+qa")
+	installCmd := exec.CommandContext(ctx, "nvim", "--headless", "+PaqInstall", "+qa")
 	if output, err := installCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("error running neovim plugin sync commands: %w\n%s", err, string(output))
 	}
@@ -61,7 +61,7 @@ func (v *Nvim) initLua() string {
 	pluginLines = append(pluginLines, paqBootstrap)
 	pluginLines = append(pluginLines, `require "paq" {`)
 	for _, plugin := range v.Plugins {
-		pluginLines = append(pluginLines, fmt.Sprintf(`  "%v";`, plugin))
+		pluginLines = append(pluginLines, fmt.Sprintf(`  %v;`, plugin))
 	}
 	pluginLines = append(pluginLines, "}", "\n")
 	lines := append(pluginLines, string(v.Config))
@@ -69,30 +69,20 @@ func (v *Nvim) initLua() string {
 }
 
 type Plugin struct {
-	Owner string `json:"owner"`
-	Repo  string `json:"repo"`
-}
-
-func (p Plugin) toVimPlug() string {
-	return fmt.Sprintf("Plug '%s'", p.String())
+	Name string `json:"name"`
+	Opt  bool   `json:"opt,omitempty"`
+	Run  string `json:"run,omitempty"`
 }
 
 func (p Plugin) String() string {
-	return fmt.Sprintf("%s/%s", p.Owner, p.Repo)
-}
-
-func (p *Plugin) UnmarshalJSON(b []byte) error {
-	var intermediary string
-	if err := json.Unmarshal(b, &intermediary); err != nil {
-		return err
+	components := []string{fmt.Sprintf(`"%s"`, p.Name)}
+	if p.Opt {
+		components = append(components, "opt=true")
 	}
-	components := strings.Split(intermediary, "/")
-	if len(components) != 2 {
-		return fmt.Errorf(`expected plugin to resemble "owner/repo": got %s`, intermediary)
+	if p.Run != "" {
+		components = append(components, fmt.Sprintf(`run="%s"`, p.Run))
 	}
-	p.Owner = components[0]
-	p.Repo = components[1]
-	return nil
+	return fmt.Sprintf("{%s}", strings.Join(components, ", "))
 }
 
 type NvimConfig string
