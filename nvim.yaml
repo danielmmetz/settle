@@ -1,20 +1,15 @@
 nvim:
-  plugin_dir: /Users/dmetz/.vim/plugged
   plugins:
-    # vim theming
+    # bootstrap
+    - savq/paq-nvim
+    # themeing
     - KeitaNakamura/neodark.vim
-    - vim-airline/vim-airline
-    - vim-airline/vim-airline-themes
-    # vim code navigation
+    # code navigation
     - rafaqz/ranger.vim
     - junegunn/fzf
     - junegunn/fzf.vim
-    # vim editor ui
-    - mhinz/vim-signify
-    - neovim/nvim-lsp
-    - neovim/nvim-lspconfig
-    - nvim-lua/completion-nvim
     # vim enhancements
+    - mhinz/vim-signify
     - mhinz/vim-sayonara
     - tpope/vim-abolish
     - tpope/vim-commentary
@@ -24,170 +19,172 @@ nvim:
     - tpope/vim-sensible
     - tpope/vim-surround
     - tpope/vim-unimpaired
+    - nvim-treesitter/nvim-treesitter  # TODO run TSUpdate on install/update
     # vim editing enhancements
     - itchyny/vim-cursorword
     - jiangmiao/auto-pairs
     - ntpeters/vim-better-whitespace
     - machakann/vim-swap
+    - PeterRincker/vim-argumentative
     - wellle/targets.vim
     - chrisbra/SudoEdit.vim
     - AndrewRadev/splitjoin.vim
-    # vim language specific
-    - fatih/vim-go
-    - HerringtonDarkholme/yats.vim
-    - hashivim/vim-terraform
+    # LSP
+    - neovim/nvim-lspconfig
+    - hrsh7th/cmp-nvim-lsp
+    - hrsh7th/cmp-buffer
+    - hrsh7th/cmp-path
+    - hrsh7th/nvim-cmp
   config: |
-    lua << EOF
-      lspconfig = require('lspconfig')
-      lspconfig.gopls.setup {
-        on_attach = require('completion').on_attach,
-        cmd = {"gopls", "serve"},
-        settings = {
-          gopls = {
-            analyses = {
-              unusedparams = true,
-            },
-            staticcheck = true,
-          },
+    ----------------------------------------
+    -- options
+    ----------------------------------------
+    vim.cmd("colorscheme neodark")
+
+    vim.opt.autoread = true
+    vim.opt.clipboard = {"unnamed", "unnamedplus"}
+    vim.opt.cursorline = true
+    vim.opt.visualbell = true
+    vim.opt.mouse = "a"
+    vim.opt.inccommand = "nosplit"
+
+    vim.opt.wrap = false
+    vim.opt.number = true
+    vim.opt.splitbelow = true
+    vim.opt.splitright = true
+
+    vim.opt.expandtab = true
+    vim.opt.shiftwidth = 4
+    vim.opt.softtabstop = 4
+    vim.opt.smarttab = true
+    vim.opt.tabstop = 4
+
+    vim.opt.completeopt = {"menuone", "noinsert", "noselect"}
+    vim.opt.shortmess = vim.opt.shortmess + "c"
+
+    ----------------------------------------
+    -- mappings
+    ----------------------------------------
+    function map(mode, lhs, rhs, opts)
+      local options = {noremap = true}
+      if opts then options = vim.tbl_extend("force", options, opts) end
+      vim.api.nvim_set_keymap(mode, lhs, rhs, options)
+    end
+
+    map("n", "Y", "y$")
+    map("n", "B", "^")
+    map("n", "E", "$")
+    map("n", "<C-n>", ":noh<CR>")
+    map("n", "j", "gj")
+    map("n", "k", "gk")
+
+    map("t", "<Esc>", "<C-\\><C-n>")
+
+    map("n", "<C-h>", "<C-w>h")
+    map("n", "<C-j>", "<C-w>j")
+    map("n", "<C-k>", "<C-w>k")
+    map("n", "<C-l>", "<C-w>l")
+
+    ----------------------------------------
+    -- plugin setup and config
+    ----------------------------------------
+    -- fzf
+    map("n", "<C-b>", ":Buffers<cr>")
+    map("n", "<C-p>", ":GFiles<cr>")
+    map("n", "<C-f>", ":Rg<cr>")
+    vim.g.fzf_preview_window = ""
+
+    -- better whitespace
+    vim.g.better_whitespace_enabled = 0
+    vim.g.strip_whitelines_at_eof = 1
+    vim.g.strip_whitespace_confirm = 0
+    vim.g.strip_whitespace_on_save = 1
+
+    -- sayonara
+    map("n", "<C-c>", ":Sayonara!<cr>")
+
+    -- vim-swap
+    map("o", "i,", "<Plug>(swap-textobject-i)")
+    map("x", "i,", "<Plug>(swap-textobject-i)")
+    map("o", "a,", "<Plug>(swap-textobject-a)")
+    map("x", "a,", "<Plug>(swap-textobject-a)")
+
+    -- treesitter
+    require "nvim-treesitter.configs".setup {
+      ensure_installed = "maintained",
+      highlight = { enable = true },
+      indent = { enable = true },
+    }
+
+    -- Completions & LSP
+    local cmp = require('cmp')
+    cmp.setup({
+      completion = {
+        keyword_length = 3,
+      },
+      sources = cmp.config.sources({
+        { name = 'nvim_lsp' },
+      }, {
+        { name = 'buffer' },
+      }),
+    })
+
+    local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
+    local on_attach = function()
+      -- vim.api.nvim_set_keymap("n", "<Leader>o", "<cmd>lua vim.lsp.buf.document_symbol()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "ga", "<cmd>lua vim.lsp.buf.code_action()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gd", "<cmd>lua vim.lsp.buf.definition()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gD", "<cmd>lua vim.lsp.buf.declaration()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gr", "<cmd>lua vim.lsp.buf.references()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gi", "<cmd>lua vim.lsp.buf.implementation()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gt", "<cmd>lua vim.lsp.buf.type_definition()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gn", "<cmd>lua vim.lsp.diagnostic.goto_next()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "gp", "<cmd>lua vim.lsp.diagnostic.goto_prev()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "<Leader>r", "<cmd>lua vim.lsp.buf.rename()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "K", "<cmd>lua vim.lsp.buf.hover()<CR>", {noremap = true, silent = true})
+      vim.api.nvim_set_keymap("n", "<C-k>", "<cmd>lua vim.lsp.buf.signature_help()<CR>", {noremap = true, silent = true})
+      -- vim.api.nvim_set_keymap("n", "g0", "<cmd>lua vim.lsp.buf.document_symbol()<CR>", {noremap = true, silent = true})
+      -- vim.api.nvim_set_keymap("n", "gW", "<cmd>lua vim.lsp.buf.workspace_symbol()<CR>", {noremap = true, silent = true})
+    end
+
+    local lspconfig = require('lspconfig')
+    lspconfig.gopls.setup{
+      on_attach = on_attach,
+      capabilities = capabilities,
+      cmd = {"gopls"},
+      flags = {debounce_text_changes = 500},
+      settings = {
+        gopls = {
+          usePlaceholders = true, --enables placeholders for function parameters or struct fields in completion responses
+          analyses = {unusedparams = true},
+          staticcheck = true,
         },
-      }
-      function goimports(timeout_ms)
-        local context = { source = { organizeImports = true } }
-        vim.validate { context = { context, "t", true } }
-
-        local params = vim.lsp.util.make_range_params()
-        params.context = context
-
-        -- See the implementation of the textDocument/codeAction callback
-        -- (lua/vim/lsp/handler.lua) for how to do this properly.
-        local result = vim.lsp.buf_request_sync(0, "textDocument/codeAction", params, timeout_ms)
-        if not result or next(result) == nil then return end
-        local actions = result[1].result
-        if not actions then return end
-        local action = actions[1]
-
-        -- textDocument/codeAction can return either Command[] or CodeAction[]. If it
-        -- is a CodeAction, it can have either an edit, a command or both. Edits
-        -- should be executed first.
-        if action.edit or type(action.command) == "table" then
-          if action.edit then
-            vim.lsp.util.apply_workspace_edit(action.edit)
-          end
-          if type(action.command) == "table" then
-            vim.lsp.buf.execute_command(action.command)
-          end
-        else
-          vim.lsp.buf.execute_command(action)
-        end
+      },
+    }
+    lspconfig.pyright.setup{}
+    ----------------------------------------
+    -- augroups
+    ----------------------------------------
+    -- auto_format_lsp formats current buffer if attached lsp client
+    -- has 'document_formatting' capability
+    function auto_format_lsp()
+      local id, client = next(vim.lsp.buf_get_clients())
+      if id ~= nil and client.resolved_capabilities.document_formatting then
+        vim.lsp.buf.formatting_sync(nil, 100)
       end
-    EOF
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " augroups
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " not yet viable: see https://github.com/golang/go/issues/43735
-    " autocmd BufWritePre *.go lua vim.lsp.buf.formatting()
-    " autocmd BufWritePre *.go lua goimports(5000)
-    autocmd FileType go setlocal omnifunc=v:lua.vim.lsp.omnifunc
+    end
 
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " appearance / behavior
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    map <C-l> <silent>
+    vim.cmd[[
+    augroup lsp
+      autocmd!
+      autocmd BufWritePre * lua auto_format_lsp()
+    augroup END
+    ]]
 
-    colorscheme neodark
-
-    set autoread
-    set clipboard^=unnamed,unnamedplus
-    set cursorline
-    set visualbell
-    set mouse=a
-    set inccommand=nosplit
-
-    set nowrap
-    set number
-    set splitbelow
-    set splitright
-
-    set expandtab
-    set shiftwidth=4
-    set softtabstop=4
-    set smarttab
-    set tabstop=4
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " plugin overrides
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " airline
-    let g:airline#extensions#branch#enabled = 0
-    let g:airline#extensions#hunks#enabled = 0
-    let g:airline#extensions#tabline#enabled = 0
-    let g:airline#extensions#virtualenv#enabled = 0
-    let g:airline_powerline_fonts=1
-    let g:airline_theme='onedark'
-
-    " better whitespace
-    let g:better_whitespace_enabled = 0
-    let g:strip_whitelines_at_eof = 1
-    let g:strip_whitespace_confirm = 0
-    let g:strip_whitespace_on_save = 1
-
-    " fzf.vim
-    let g:fzf_preview_window = ""
-
-    " completion-nvim
-    let g:completion_trigger_keyword_length = 3
-    set completeopt=menuone,noinsert,noselect
-    set shortmess+=c
-
-    " vim-go
-    let g:go_fmt_command = "goimports"
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " misc key maps
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    nnoremap Y y$
-    nnoremap B ^
-    nnoremap E $
-    nnoremap <C-n> :noh<CR>
-    nnoremap j gj
-    nnoremap k gk
-
-    tnoremap <Esc> <C-\><C-n>
-
-    nnoremap <C-h> <C-w>h
-    nnoremap <C-j> <C-w>j
-    nnoremap <C-k> <C-w>k
-    nnoremap <C-l> <C-w>l
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " fzf
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    nnoremap <C-b> :Buffers<cr>
-    nnoremap <C-p> :GFiles<cr>
-    nnoremap <C-f> :Rg<cr>
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " neovim lsp
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    nmap <leader>r <cmd>lua vim.lsp.buf.rename()<CR>
-    nmap <silent> gd <cmd>lua vim.lsp.buf.definition()<CR>
-    nmap <silent> gi <cmd>lua vim.lsp.buf.implementation()<CR>
-    nmap <silent> gr <cmd>lua vim.lsp.buf.references()<CR>
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " ranger
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    command! Ranger call RangerEdit("edit")
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " sayonara
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    map <C-c> :Sayonara!<cr>
-
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    " vim-swap
-    """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-    omap i, <Plug>(swap-textobject-i)
-    xmap i, <Plug>(swap-textobject-i)
-    omap a, <Plug>(swap-textobject-a)
-    xmap a, <Plug>(swap-textobject-a)
+    -- go configurations
+    vim.cmd[[
+    augroup golang
+      autocmd!
+      au FileType go setlocal tabstop=4 shiftwidth=4 softtabstop=4 noexpandtab
+    augroup END
+    ]]
