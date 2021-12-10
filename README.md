@@ -10,8 +10,8 @@ See [here for an example config](./settle.yaml).
 ## Current feature set
 
 **Neovim Support**:
-* generate `init.vim` from specified plugins and additional config
-* install vim-plug & install specified plugins
+* generate `init.lua` from specified plugins and additional config
+* install paq & install specified plugins
 
 **Apt Support**:
 * supports installing packages
