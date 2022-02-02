@@ -51,7 +51,7 @@ func (z *Zsh) Ensure(ctx context.Context) error {
 }
 
 const (
-	zinitURL = "https://raw.githubusercontent.com/zdharma/zinit/master/zinit.zsh"
+	zinitURL = "https://raw.githubusercontent.com/zdharma-continuum/zinit/master/zinit.zsh"
 )
 
 func (z *Zsh) ensureZinit(ctx context.Context) error {
@@ -73,7 +73,7 @@ func (z *Zsh) ensureZinit(ctx context.Context) error {
 	}
 
 	fmt.Println("installing Zinit")
-	cloneCmd := exec.CommandContext(ctx, "git", "clone", "https://github.com/zdharma/zinit.git", filepath.Join(home, ".zinit", "bin"))
+	cloneCmd := exec.CommandContext(ctx, "git", "clone", "https://github.com/zdharma-continuum/zinit.git", filepath.Join(home, ".zinit", "bin"))
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("error cloning zinit: %w\n%s", err, string(output))
 	}
@@ -95,7 +95,7 @@ func (z *Zsh) String() string {
 
 	// history
 	if z.History.Size != 0 {
-		sb.WriteString(fmt.Sprintf("HISTFILE=~/.zsh_history\n"))
+		sb.WriteString("HISTFILE=~/.zsh_history\n")
 		sb.WriteString(fmt.Sprintf("HISTSIZE=%d\n", z.History.Size))
 		sb.WriteString(fmt.Sprintf("SAVEHIST=%d\n", z.History.Size))
 	}
