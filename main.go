@@ -18,53 +18,20 @@ import (
 
 func mainE(ctx context.Context) error {
 	var (
-		dumpConfig string
+		command    string
 		configPath string
+		format     string
 		target     string
 	)
-	flag.StringVar(&dumpConfig, "dump-config", "", "if specified, prints the parsed config file in the specified format (json or yaml) then exits")
+	flag.StringVar(&command, "command", "ensure", "sub-command for settle (ensure or dump-config)")
 	flag.StringVar(&configPath, "config", "", "if specified, uses config file at given path (default: previous value, then settle.yaml)")
+	flag.StringVar(&format, "format", "json", "output format for parsed config (json or yaml)")
 	flag.StringVar(&target, "target", "", "if specified, applies only specified stanza of the config")
 	flag.Parse()
 
-	home, err := os.UserHomeDir()
+	c, err := loadConfig(configPath)
 	if err != nil {
-		return fmt.Errorf("unable to determine home dir: %w", err)
-	}
-	if configPath == "" {
-		settingsPath := filepath.Join(home, ".config", "settle", "settings.yaml")
-		b, err := ioutil.ReadFile(settingsPath)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("error reading %s: %w", settingsPath, err)
-		}
-		if err == nil {
-			var s settings
-			if err := yaml.Unmarshal(b, &s); err != nil {
-				return fmt.Errorf("error parsing %s: %w", settingsPath, err)
-			}
-			configPath = s.ConfigPath
-		}
-		if configPath == "" {
-			configPath = "settle.yaml"
-		}
-	}
-
-	absConfigPath, err := filepath.Abs(configPath)
-	if err != nil {
-		return fmt.Errorf("error determing absolute path from %s: %w", configPath, err)
-	}
-	configDir := filepath.Dir(absConfigPath)
-	if err := os.Chdir(configDir); err != nil {
-		return fmt.Errorf("error changing directory to %s: %w", configDir, err)
-	}
-
-	configBytes, err := ioutil.ReadFile(absConfigPath)
-	if err != nil {
-		return fmt.Errorf("error reading config file %s: %w", absConfigPath, err)
-	}
-	var c config
-	if err := yaml.Unmarshal(configBytes, &c); err != nil {
-		return fmt.Errorf("error parsing config file: %w", err)
+		return fmt.Errorf("error loading config: %w", err)
 	}
 
 	var opts []option
@@ -80,41 +47,111 @@ func mainE(ctx context.Context) error {
 		return fmt.Errorf("unsupported target specified: %s", target)
 	}
 
-	if dumpConfig != "" {
-		for _, o := range opts {
-			o(&c)
-		}
+	for _, o := range opts {
+		o(&c)
+	}
 
-		var bDump []byte
-		var err error
-		switch dumpConfig {
+	switch command {
+	case "dump-config":
+		var b []byte
+		switch format {
 		case "json":
-			bDump, err = json.MarshalIndent(c, "", "  ")
+			b = c.JSON()
 		case "yaml":
-			bDump, err = yaml.Marshal(c)
+			b = c.YAML()
 		default:
-			return fmt.Errorf(`invalid dump-config value specified: expected "json" or "yaml"`)
+			return fmt.Errorf(`invalid format value specified: expected "json" or "yaml"`)
 		}
+		fmt.Println(string(b))
+		return nil
+	case "ensure":
+		if err := c.Ensure(ctx); err != nil {
+			return err
+		}
+
+		if target != "" {
+			fmt.Println("skipping writing of settings.yaml and creating settle.yaml backup: non-zero target specified:", target)
+			return nil
+		}
+
+		return writeBackup(c)
+	default:
+		return fmt.Errorf("invalid command specified: %s", command)
+	}
+}
+
+// loadConfig loads the config at path.
+// If path == "", it will attempt to infer the config path.
+// Note: loadConfig may change the program's working directory
+// so that it may correctly handle relative paths.
+func loadConfig(path string) (config, error) {
+	var err error
+	if path == "" {
+		path, err = inferConfigPath()
 		if err != nil {
-			return fmt.Errorf("error marshaling config: %w", err)
+			return config{}, fmt.Errorf("error inferring config file path: %w", err)
 		}
-		fmt.Println(string(bDump))
-		return nil
 	}
 
-	if err := c.Ensure(ctx, opts...); err != nil {
-		return err
+	absConfigPath, err := filepath.Abs(path)
+	if err != nil {
+		return config{}, fmt.Errorf("error determing absolute path from %s: %w", path, err)
+	}
+	configDir := filepath.Dir(absConfigPath)
+	if err := os.Chdir(configDir); err != nil {
+		return config{}, fmt.Errorf("error changing directory to %s: %w", configDir, err)
 	}
 
-	if target != "" {
-		fmt.Println("skipping writing of settings.yaml and creating settle.yaml backup: non-zero target specified:", target)
-		return nil
+	configBytes, err := ioutil.ReadFile(absConfigPath)
+	if err != nil {
+		return config{}, fmt.Errorf("error reading config file %s: %w", absConfigPath, err)
 	}
+	var c config
+	if err := yaml.Unmarshal(configBytes, &c); err != nil {
+		return config{}, fmt.Errorf("error parsing config file: %w", err)
+	}
+	c.absPath = absConfigPath
+	return c, nil
+}
 
-	settingsBytes, err := yaml.Marshal(settings{ConfigPath: absConfigPath})
+// inferConfigPath infers the config file path using the following priorities:
+// 1. last used config file path (as stored in settings.yaml)
+// 2. settle.yaml
+func inferConfigPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine home dir: %w", err)
+	}
+	settingsPath := filepath.Join(home, ".config", "settle", "settings.yaml")
+	b, err := ioutil.ReadFile(settingsPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("error reading %s: %w", settingsPath, err)
+	}
+	var configPath string
+	if err == nil {
+		var s settings
+		if err := yaml.Unmarshal(b, &s); err != nil {
+			return "", fmt.Errorf("error parsing %s: %w", settingsPath, err)
+		}
+		configPath = s.ConfigPath
+	}
+	if configPath == "" {
+		configPath = "settle.yaml"
+	}
+	return configPath, nil
+}
+
+func writeBackup(c config) error {
+	settingsBytes, err := yaml.Marshal(settings{ConfigPath: c.absPath})
 	if err != nil {
 		return fmt.Errorf("error marshaling contents for settings.yaml: %w", err)
 	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home dir: %w", err)
+	}
+
 	_ = os.MkdirAll(filepath.Join(home, ".config", "settle"), 0755)
 	err = ioutil.WriteFile(
 		filepath.Join(home, ".config", "settle", "settings.yaml"),
@@ -128,7 +165,7 @@ func mainE(ctx context.Context) error {
 	_ = os.MkdirAll(filepath.Join(xdgDataDir, "settle"), 0755)
 	err = ioutil.WriteFile(
 		filepath.Join(home, ".local", "share", "settle", fmt.Sprintf("%s.yaml", time.Now().Local().Format("2006-01-02 15:04:05"))),
-		configBytes,
+		c.YAML(),
 		0644,
 	)
 	if err != nil {
@@ -159,6 +196,9 @@ type config struct {
 	Apt   *Apt   `json:"apt"`
 	Nvim  *Nvim  `json:"nvim"`
 	Zsh   *Zsh   `json:"zsh"`
+
+	// absPath is the absolute path to where config exists on disk.
+	absPath string
 }
 
 func (c *config) UnmarshalJSON(b []byte) error {
@@ -203,14 +243,19 @@ func (c *config) UnmarshalJSON(b []byte) error {
 	}
 	*c = final
 	return nil
-
 }
 
-func (c *config) Ensure(ctx context.Context, opts ...option) error {
-	for _, o := range opts {
-		o(c)
-	}
+func (c *config) JSON() []byte {
+	b, _ := json.MarshalIndent(c, "", "  ")
+	return b
+}
 
+func (c *config) YAML() []byte {
+	b, _ := yaml.Marshal(c)
+	return b
+}
+
+func (c *config) Ensure(ctx context.Context) error {
 	if err := c.Files.Ensure(ctx); err != nil {
 		return fmt.Errorf("error ensuring files: %w", err)
 	}
