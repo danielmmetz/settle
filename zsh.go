@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-git/go-git/v5"
 )
 
 type Zsh struct {
@@ -73,9 +74,9 @@ func (z *Zsh) ensureZinit(ctx context.Context) error {
 	}
 
 	fmt.Println("installing Zinit")
-	cloneCmd := exec.CommandContext(ctx, "git", "clone", "https://github.com/zdharma-continuum/zinit.git", filepath.Join(home, ".zinit", "bin"))
-	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("error cloning zinit: %w\n%s", err, string(output))
+	_, err = git.PlainCloneContext(ctx, filepath.Join(home, ".zinit", "bin"), false, &git.CloneOptions{URL: "https://github.com/zdharma-continuum/zinit.git"})
+	if err != nil {
+		return fmt.Errorf("error cloning zinit: %w", err)
 	}
 	return nil
 }
