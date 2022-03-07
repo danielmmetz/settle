@@ -32,7 +32,7 @@ version=0.0.6  # TODO integrate with releases.
 settle_base=$(pwd)
 
 check_binary() {
-  echo -n "  - checking settle executable"
+  echo -n "present version: "
   local output
   output=$("$settle_base"/bin/settle -command version 2>&1)
   if [ $? -ne 0 ]; then
@@ -44,7 +44,7 @@ check_binary() {
       echo "$output != $version"
       binary_error="invalid version"
     else
-      echo ": found $output"
+      echo "$output"
       binary_error=""
       return 0
     fi
@@ -64,9 +64,8 @@ try_wget() {
 }
 
 download() {
-  echo "downloading settle"
   if [ -x "$settle_base"/bin/settle ]; then
-    echo "  - already exists"
+    echo "settle already exists"
     check_binary && return
   fi
   mkdir -p "$settle_base"/bin && cd "$settle_base"/bin
@@ -75,6 +74,7 @@ download() {
     return
   fi
 
+  echo "downloading settle"
   local url
   url=https://github.com/danielmmetz/settle/releases/download/v$version/${1}
   set -o pipefail
@@ -126,7 +126,7 @@ if [ -n "$binary_error" ]; then
   fi
 fi
 
-if [ -z "$1" ]; then
+if [ $# -eq 0 ]; then
   exit 0
 fi
 
