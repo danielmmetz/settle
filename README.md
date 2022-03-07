@@ -47,6 +47,12 @@ Clones the specified repo before settling in.
 
 `settle -command init -repo danielmmetz/settle -auth pubkey -private-key /path/to/key`
 
+Don't yet have settle?
+
+```bash
+curl -sL https://raw.githubusercontent.com/danielmmetz/settle/master/settle.sh > /tmp/settle.sh && bash /tmp/settle.sh -command init -repo danielmmetz/settle
+```
+
 ### Run history
 
 After a successful run, a copy of that run's `settle.yaml` is backed up to `~/.local/share/settle`.
@@ -63,7 +69,6 @@ and allows a user to more easily maintain multiple config files in a single dire
 
 ## Future features
 
-* simplified bootstrapping (e.g. `settle init github.com/<user>/<dofiles-repo>`)
 * simplified rollbacks (e.g. `settle history` and `settle rollback <time>`)
 
 ### TODOs for docs
