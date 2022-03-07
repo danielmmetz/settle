@@ -1,40 +1,46 @@
 nvim:
   plugins:
     # bootstrap
-    - savq/paq-nvim
+    - name: savq/paq-nvim
     # themeing
-    - KeitaNakamura/neodark.vim
+    - name: KeitaNakamura/neodark.vim
     # code navigation
-    - rafaqz/ranger.vim
-    - junegunn/fzf
-    - junegunn/fzf.vim
+    - name: rafaqz/ranger.vim
+    - name: junegunn/fzf
+    - name: junegunn/fzf.vim
     # vim enhancements
-    - mhinz/vim-signify
-    - mhinz/vim-sayonara
-    - tpope/vim-abolish
-    - tpope/vim-commentary
-    - tpope/vim-fugitive
-    - tpope/vim-repeat
-    - tpope/vim-rhubarb
-    - tpope/vim-sensible
-    - tpope/vim-surround
-    - tpope/vim-unimpaired
-    - nvim-treesitter/nvim-treesitter  # TODO run TSUpdate on install/update
+    - name: nvim-lua/plenary.nvim
+    - name: lewis6991/gitsigns.nvim
+    - name: mhinz/vim-sayonara
+    - name: tpope/vim-abolish
+    - name: numToStr/Comment.nvim
+    - name: tpope/vim-fugitive
+    - name: tpope/vim-repeat
+    - name: tpope/vim-rhubarb
+    - name: tpope/vim-sensible
+    - name: tpope/vim-surround
+    - name: tpope/vim-unimpaired
+    - name: nvim-treesitter/nvim-treesitter  # TODO run TSUpdate on install/update
     # vim editing enhancements
-    - itchyny/vim-cursorword
-    - jiangmiao/auto-pairs
-    - ntpeters/vim-better-whitespace
-    - machakann/vim-swap
-    - PeterRincker/vim-argumentative
-    - wellle/targets.vim
-    - chrisbra/SudoEdit.vim
-    - AndrewRadev/splitjoin.vim
+    - name: itchyny/vim-cursorword
+    - name: windwp/nvim-autopairs
+    - name: ntpeters/vim-better-whitespace
+    - name: machakann/vim-swap
+    - name: PeterRincker/vim-argumentative
+    - name: wellle/targets.vim
+    - name: chrisbra/SudoEdit.vim
+    - name: AndrewRadev/splitjoin.vim
     # LSP
-    - neovim/nvim-lspconfig
-    - hrsh7th/cmp-nvim-lsp
-    - hrsh7th/cmp-buffer
-    - hrsh7th/cmp-path
-    - hrsh7th/nvim-cmp
+    - name: neovim/nvim-lspconfig
+    - name: hrsh7th/cmp-nvim-lsp
+    - name: hrsh7th/cmp-buffer
+    - name: hrsh7th/cmp-path
+    - name: hrsh7th/nvim-cmp
+    - name: ray-x/lsp_signature.nvim
+    # telescope
+    # - name: nvim-telescope/telescope-fzf-native.nvim  # TODO after adding run support
+    - name: gbrlsnchs/telescope-lsp-handlers.nvim
+    - name: nvim-telescope/telescope.nvim
   config: |
     ----------------------------------------
     -- options
@@ -89,8 +95,6 @@ nvim:
     -- plugin setup and config
     ----------------------------------------
     -- fzf
-    map("n", "<C-b>", ":Buffers<cr>")
-    map("n", "<C-p>", ":GFiles<cr>")
     map("n", "<C-f>", ":Rg<cr>")
     vim.g.fzf_preview_window = ""
 
@@ -102,6 +106,11 @@ nvim:
 
     -- sayonara
     map("n", "<C-c>", ":Sayonara!<cr>")
+
+    -- gitsigns
+    require('gitsigns').setup({
+      signs = {delete = {show_count=true}}
+    })
 
     -- vim-swap
     map("o", "i,", "<Plug>(swap-textobject-i)")
@@ -116,7 +125,29 @@ nvim:
       indent = { enable = true },
     }
 
-    -- Completions & LSP
+    -- autopairs
+    require("nvim-autopairs").setup({ check_ts = true })
+
+    -- comment
+    require('Comment').setup()
+
+    -- telescope
+    local telescope = require("telescope")
+    telescope.setup({})
+    telescope.load_extension('lsp_handlers')
+    map("n", "<C-p>", ":lua require'telescope.builtin'.git_files()<CR>", silent)
+    map("n", "<space>ff", ":lua require'telescope.builtin'.find_files()<CR>", silent)
+    map("n", "<space>fh", ":lua require'telescope.builtin'.help_tags()<CR>", silent)
+    map("n", "<space>fg", ":lua require('telescope.builtin').live_grep()<CR>", silent)
+    map("n", "<space>fk", ":lua require('telescope.builtin').keymaps()<CR>", silent)
+    map("n", "<space>fc", ":lua require('telescope.builtin').git_commits()<CR>", silent)
+    map("n", "<space>fj", ":lua require('telescope.builtin').git_bcommits()<CR>", silent)
+    map("n", "<space>fd", ":lua require('telescope.builtin').lsp_workspace_diagnostics()<CR>", silent)
+    map("n", "<space>fs", ":lua require('telescope.builtin').lsp_dynamic_workspace_symbols()<CR>", silent)
+    map("n", "<space>fb", ":lua require('telescope.builtin').buffers()<CR>", silent)
+    map("n", "<space>fr", ":lua require('telescope.builtin').file_browser()<CR>", silent)
+
+    -- completions & LSP
     local cmp = require('cmp')
     cmp.setup({
       completion = {
@@ -137,12 +168,12 @@ nvim:
       vim.api.nvim_set_keymap("n", "gD", "<cmd>lua vim.lsp.buf.declaration()<CR>", {noremap = true, silent = true})
       vim.api.nvim_set_keymap("n", "gr", "<cmd>lua vim.lsp.buf.references()<CR>", {noremap = true, silent = true})
       vim.api.nvim_set_keymap("n", "gi", "<cmd>lua vim.lsp.buf.implementation()<CR>", {noremap = true, silent = true})
-      vim.api.nvim_set_keymap("n", "gt", "<cmd>lua vim.lsp.buf.type_definition()<CR>", {noremap = true, silent = true})
+      -- vim.api.nvim_set_keymap("n", "gt", "<cmd>lua vim.lsp.buf.type_definition()<CR>", {noremap = true, silent = true})
       vim.api.nvim_set_keymap("n", "gn", "<cmd>lua vim.lsp.diagnostic.goto_next()<CR>", {noremap = true, silent = true})
       vim.api.nvim_set_keymap("n", "gp", "<cmd>lua vim.lsp.diagnostic.goto_prev()<CR>", {noremap = true, silent = true})
       vim.api.nvim_set_keymap("n", "<Leader>r", "<cmd>lua vim.lsp.buf.rename()<CR>", {noremap = true, silent = true})
       vim.api.nvim_set_keymap("n", "K", "<cmd>lua vim.lsp.buf.hover()<CR>", {noremap = true, silent = true})
-      vim.api.nvim_set_keymap("n", "<C-k>", "<cmd>lua vim.lsp.buf.signature_help()<CR>", {noremap = true, silent = true})
+      -- vim.api.nvim_set_keymap("n", "<C-i>", "<cmd>lua vim.lsp.buf.signature_help()<CR>", {noremap = true, silent = true})
       -- vim.api.nvim_set_keymap("n", "g0", "<cmd>lua vim.lsp.buf.document_symbol()<CR>", {noremap = true, silent = true})
       -- vim.api.nvim_set_keymap("n", "gW", "<cmd>lua vim.lsp.buf.workspace_symbol()<CR>", {noremap = true, silent = true})
     end
@@ -155,6 +186,7 @@ nvim:
       flags = {debounce_text_changes = 500},
       settings = {
         gopls = {
+          buildFlags = {"-tags=integration"},
           usePlaceholders = true, --enables placeholders for function parameters or struct fields in completion responses
           analyses = {unusedparams = true},
           staticcheck = true,
@@ -162,6 +194,8 @@ nvim:
       },
     }
     lspconfig.pyright.setup{}
+
+    require "lsp_signature".setup()
     ----------------------------------------
     -- augroups
     ----------------------------------------

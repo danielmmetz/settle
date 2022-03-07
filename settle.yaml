@@ -16,8 +16,9 @@ brew:
     - homebrew/cask
     - homebrew/cask-fonts
     - homebrew/cask-versions
-    - neovim/neovim
   pkgs:
+    # core
+    - name: age
     - name: bandwhich
     - name: bash
     - name: bat
@@ -30,13 +31,15 @@ brew:
     - name: fzf
     - name: gh
     - name: git
-    - name: graphviz  # needed for pprof web
-    - name: gron
+    - name: gnu-getopt
     - name: go
     - name: golangci/tap/golangci-lint
+    - name: graphviz  # needed for pprof web
+    - name: gron
     - name: htop
     - name: hub
     - name: icdiff
+    - name: jless
     - name: jq
     - name: make
     - name: moreutils
@@ -46,6 +49,7 @@ brew:
     - name: openssl
     - name: pandoc
     - name: postgresql
+    - name: postgresql@11
     - name: pre-commit
     - name: python
     - name: python-yq
@@ -68,6 +72,7 @@ brew:
     - name: vim
     - name: watch
     - name: wget
+    - name: xh
     - name: xsv
     - name: yamllint
     - name: zsh
@@ -88,6 +93,7 @@ brew:
     - signal
     - slack
     - spotify
+    - stats
     - steam
     - the-unarchiver
     - vlc
@@ -96,7 +102,7 @@ zsh:
   zinit:
     - ice pick=async.zsh src=pure.zsh
     - light sindresorhus/pure
-    - light zdharma/fast-syntax-highlighting
+    - light zdharma-continuum/fast-syntax-highlighting
     - snippet OMZ::plugins/fasd/fasd.plugin.zsh
     - snippet OMZ::plugins/fzf/fzf.plugin.zsh
   history:
@@ -112,18 +118,19 @@ zsh:
     - {name: HOMEBREW_NO_AUTO_UPDATE, value: "1"}
   aliases:
     - {name: cat, value: "bat"}
+    - {name: jl, value: "jless"}
     - {name: la, value: "ls -la"}
     - {name: ll, value: "ls -l"}
     - {name: ls, value: "exa"}
     - {name: vi, value: "nvim"}
     - {name: vim, value: "nvim"}
-    - {name: vimrc, value: "nvim $DOTFILES/settle.yaml"}
+    - {name: vimrc, value: "nvim $DOTFILES/nvim.yaml"}
     - {name: zshrc, value: "nvim $DOTFILES/settle.yaml"}
   extra_prefix: |
     if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
-        echo "Installing DHARMA Initiative Plugin Manager (zdharma/zinit)…"
+        echo "Installing DHARMA Initiative Plugin Manager (zdharma-continuum/zinit)…"
         mkdir -p "$HOME/.zinit" && chmod g-rwX "$HOME/.zinit"
-        git clone https://github.com/zdharma/zinit "$HOME/.zinit/bin" && \
+        git clone https://github.com/zdharma-continuum/zinit "$HOME/.zinit/bin" && \
             echo "Installation successful" || \
             echo "The clone has failed."
     fi
@@ -132,4 +139,16 @@ zsh:
     autoload -Uz _zinit
     (( ${+_comps} )) && _comps[zinit]=_zinit
   extra_suffix: |
-    if test -f ~/.credentials; then source $HOME/.credentials; fi
+    _direnv_hook() {
+    trap -- '' SIGINT;
+      eval "$("/usr/local/bin/direnv" export zsh)";
+      trap - SIGINT;
+    }
+    typeset -ag precmd_functions;
+    if [[ -z ${precmd_functions[(r)_direnv_hook]} ]]; then
+      precmd_functions=( _direnv_hook ${precmd_functions[@]} )
+    fi
+    typeset -ag chpwd_functions;
+    if [[ -z ${chpwd_functions[(r)_direnv_hook]} ]]; then
+      chpwd_functions=( _direnv_hook ${chpwd_functions[@]} )
+    fi
