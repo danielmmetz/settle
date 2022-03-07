@@ -55,7 +55,7 @@ check_binary() {
 
 try_curl() {
   command -v curl > /dev/null &&
-  curl -sfL $1 | tar -xzf -
+  curl -fsSL $1 | tar -xzf -
 }
 
 try_wget() {
