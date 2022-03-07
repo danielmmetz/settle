@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,7 +44,7 @@ func (v *Nvim) ensureInitVim() error {
 		return fmt.Errorf("error making intermediate directories for %s: %w", cfgPath, err)
 	}
 	fmt.Println("writing vim config to", cfgPath)
-	return ioutil.WriteFile(cfgPath, []byte(v.initLua()), 0755)
+	return os.WriteFile(cfgPath, []byte(v.initLua()), 0755)
 }
 
 const paqBootstrap = `-- boostrap paq

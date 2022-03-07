@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,7 +44,7 @@ func (z *Zsh) Ensure(ctx context.Context) error {
 		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
 	fmt.Println("writing .zshrc")
-	if err := ioutil.WriteFile(filepath.Join(home, ".zshrc"), []byte(z.String()), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(home, ".zshrc"), []byte(z.String()), 0644); err != nil {
 		return fmt.Errorf("error writing .zshrc: %w", err)
 	}
 	return nil

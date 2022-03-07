@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -173,7 +172,7 @@ func loadConfig(path string, opts ...option) (config, error) {
 		return config{}, fmt.Errorf("error changing directory to %s: %w", configDir, err)
 	}
 
-	configBytes, err := ioutil.ReadFile(absConfigPath)
+	configBytes, err := os.ReadFile(absConfigPath)
 	if err != nil {
 		return config{}, fmt.Errorf("error reading config file %s: %w", absConfigPath, err)
 	}
@@ -198,7 +197,7 @@ func inferConfigPath() (string, error) {
 		return "", fmt.Errorf("unable to determine home dir: %w", err)
 	}
 	settingsPath := filepath.Join(home, ".config", "settle", "settings.yaml")
-	b, err := ioutil.ReadFile(settingsPath)
+	b, err := os.ReadFile(settingsPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("error reading %s: %w", settingsPath, err)
 	}
@@ -228,7 +227,7 @@ func writeBackup(c config) error {
 	}
 
 	_ = os.MkdirAll(filepath.Join(home, ".config", "settle"), 0755)
-	err = ioutil.WriteFile(
+	err = os.WriteFile(
 		filepath.Join(home, ".config", "settle", "settings.yaml"),
 		settingsBytes,
 		0644,
@@ -238,7 +237,7 @@ func writeBackup(c config) error {
 	}
 	xdgDataDir := filepath.Join(home, ".local", "share")
 	_ = os.MkdirAll(filepath.Join(xdgDataDir, "settle"), 0755)
-	err = ioutil.WriteFile(
+	err = os.WriteFile(
 		filepath.Join(home, ".local", "share", "settle", fmt.Sprintf("%s.yaml", time.Now().Local().Format("2006-01-02 15:04:05"))),
 		c.YAML(),
 		0644,

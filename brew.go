@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -20,10 +20,11 @@ func (b *Brew) Ensure(ctx context.Context) error {
 		return nil
 	}
 
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	if err != nil {
 		return fmt.Errorf("error creating temporary Brewfile: %w", err)
 	}
+	defer f.Close()
 	fmt.Println("writing temporary Brewfile to:", f.Name())
 	if _, err := f.WriteString(b.String()); err != nil {
 		return err
