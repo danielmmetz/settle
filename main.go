@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,29 +11,36 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"golang.org/x/term"
 )
 
 func mainE(ctx context.Context) error {
 	var (
-		command    string
-		configPath string
-		format     string
-		target     string
+		command        string
+		configPath     string
+		format         string
+		target         string
+		repo           string
+		authMethod     string
+		privateKeyPath string
 	)
-	flag.StringVar(&command, "command", "ensure", "sub-command for settle (ensure or dump-config)")
+	flag.StringVar(&command, "command", "ensure", "sub-command for settle (init, ensure, or dump-config)")
 	flag.StringVar(&configPath, "config", "", "if specified, uses config file at given path (default: previous value, then settle.yaml)")
-	flag.StringVar(&format, "format", "json", "output format for parsed config (json or yaml)")
 	flag.StringVar(&target, "target", "", "if specified, applies only specified stanza of the config")
+	flag.StringVar(&format, "format", "json", "dump-config specific: output format (json or yaml)")
+	flag.StringVar(&repo, "repo", "", "init specific: clone specified repo, then ensure (format: owner/repo)")
+	flag.StringVar(&authMethod, "auth", "", `init specific: use specified auth type for clone ("", "basic", "pubkey")`)
+	flag.StringVar(&privateKeyPath, "private-key", "", `init specific: path to PEM encoded private key`)
 	flag.Parse()
-
-	c, err := loadConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("error loading config: %w", err)
-	}
 
 	var opts []option
 	switch target {
@@ -47,12 +55,14 @@ func mainE(ctx context.Context) error {
 		return fmt.Errorf("unsupported target specified: %s", target)
 	}
 
-	for _, o := range opts {
-		o(&c)
-	}
-
+	var err error
 	switch command {
 	case "dump-config":
+		c, err := loadConfig(configPath, opts...)
+		if err != nil {
+			return fmt.Errorf("error loading config: %w", err)
+		}
+
 		var b []byte
 		switch format {
 		case "json":
@@ -64,7 +74,56 @@ func mainE(ctx context.Context) error {
 		}
 		fmt.Println(string(b))
 		return nil
+	case "init":
+		repoParts := strings.Split(repo, "/")
+		if len(repoParts) != 2 {
+			return fmt.Errorf(`expected repo of form "owner/repo", got %s`, repo)
+		}
+		owner, repository := repoParts[0], repoParts[1]
+		url := fmt.Sprintf("https://github.com/%s/%s", owner, repository)
+
+		var auth transport.AuthMethod
+		switch {
+		case authMethod == "basic":
+			fmt.Print("username: ")
+			username, err := bufio.NewReader(os.Stdin).ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("error reading username: %w", err)
+			}
+			fmt.Print("password or token: ")
+			password, err := term.ReadPassword(int(syscall.Stdin))
+			fmt.Println()
+			if err != nil {
+				return fmt.Errorf("error reading password: %w", err)
+			}
+			auth = &http.BasicAuth{Username: username, Password: string(password)}
+		case authMethod == "pubkey":
+			url = fmt.Sprintf("git@github.com:%s/%s.git", owner, repository)
+			auth, err = ssh.NewPublicKeysFromFile("git", privateKeyPath, "")
+			if err != nil {
+				return fmt.Errorf("error creating pubkey auth: %w", err)
+			}
+		case authMethod != "":
+			return fmt.Errorf(`invalid auth type specified: expected "" or "basic"`)
+		}
+		_, err := git.PlainCloneContext(ctx, repository, false, &git.CloneOptions{
+			URL:  url,
+			Auth: auth,
+		})
+		if err != nil {
+			return fmt.Errorf("error cloning repo: %w", err)
+		}
+
+		if err := os.Chdir(repository); err != nil {
+			return fmt.Errorf("error chdir-ing into cloned repo")
+		}
+		fallthrough
 	case "ensure":
+		c, err := loadConfig(configPath, opts...)
+		if err != nil {
+			return fmt.Errorf("error loading config: %w", err)
+		}
+
 		if err := c.Ensure(ctx); err != nil {
 			return err
 		}
@@ -84,7 +143,7 @@ func mainE(ctx context.Context) error {
 // If path == "", it will attempt to infer the config path.
 // Note: loadConfig may change the program's working directory
 // so that it may correctly handle relative paths.
-func loadConfig(path string) (config, error) {
+func loadConfig(path string, opts ...option) (config, error) {
 	var err error
 	if path == "" {
 		path, err = inferConfigPath()
@@ -111,6 +170,10 @@ func loadConfig(path string) (config, error) {
 		return config{}, fmt.Errorf("error parsing config file: %w", err)
 	}
 	c.absPath = absConfigPath
+
+	for _, o := range opts {
+		o(&c)
+	}
 	return c, nil
 }
 

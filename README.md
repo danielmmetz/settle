@@ -37,6 +37,16 @@ See [here for an example config](./settle.yaml).
   * resolution order is the listed files for inclusion (in-order), then content in the main config file.
     The last definition wins. Stanzas are taken as all or nothing--no clever merging happens within stanzas.
 
+### Bootstrapping
+
+Clones the specified repo before settling in.
+
+`settle -command init -repo danielmmetz/settle`
+
+`settle -command init -repo danielmmetz/settle -auth basic`
+
+`settle -command init -repo danielmmetz/settle -auth pubkey -private-key /path/to/key`
+
 ### Run history
 
 After a successful run, a copy of that run's `settle.yaml` is backed up to `~/.local/share/settle`.
