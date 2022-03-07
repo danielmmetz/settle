@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -18,6 +20,10 @@ type Brew struct {
 func (b *Brew) Ensure(ctx context.Context) error {
 	if b == nil {
 		return nil
+	}
+
+	if err := ensureBrewInstalled(ctx); err != nil {
+		return fmt.Errorf("error ensuring brew is installed")
 	}
 
 	f, err := os.CreateTemp("", "")
@@ -39,6 +45,36 @@ func (b *Brew) Ensure(ctx context.Context) error {
 	cleanupCmd := exec.CommandContext(ctx, "brew", "bundle", "cleanup", "--force", "--file", f.Name())
 	if output, err := cleanupCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("error running `brew bundle cleanup`: %w\n%s", err, string(output))
+	}
+	return nil
+}
+
+func ensureBrewInstalled(ctx context.Context) error {
+	if err := exec.CommandContext(ctx, "command", "-v", "brew").Run(); err == nil {
+		return nil
+	}
+
+	fmt.Println("installing brew")
+	f, err := os.CreateTemp("", "")
+	if err != nil {
+		return fmt.Errorf("error creating tempfile for brew install script: %w", err)
+	}
+	defer f.Close()
+	resp, err := http.Get("https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh")
+	if err != nil {
+		return fmt.Errorf("error fetching brew install script: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error fetching brew install script: unexpected status code: %v", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return fmt.Errorf("error writing brew install script: %w", err)
+	}
+
+	if output, err := exec.CommandContext(ctx, "bash", "-c", f.Name()).CombinedOutput(); err != nil {
+		return fmt.Errorf("error installing brew: %w\n%s", err, string(output))
 	}
 	return nil
 }
