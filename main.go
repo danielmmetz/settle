@@ -23,6 +23,12 @@ import (
 	"golang.org/x/term"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 func mainE(ctx context.Context) error {
 	var (
 		command        string
@@ -33,7 +39,7 @@ func mainE(ctx context.Context) error {
 		authMethod     string
 		privateKeyPath string
 	)
-	flag.StringVar(&command, "command", "ensure", "sub-command for settle (init, ensure, or dump-config)")
+	flag.StringVar(&command, "command", "ensure", "sub-command for settle (init, ensure, dump-config, version, version-verbose)")
 	flag.StringVar(&configPath, "config", "", "if specified, uses config file at given path (default: previous value, then settle.yaml)")
 	flag.StringVar(&target, "target", "", "if specified, applies only specified stanza of the config")
 	flag.StringVar(&format, "format", "json", "dump-config specific: output format (json or yaml)")
@@ -57,6 +63,12 @@ func mainE(ctx context.Context) error {
 
 	var err error
 	switch command {
+	case "version":
+		fmt.Println(version)
+		return nil
+	case "version-verbose":
+		fmt.Printf("version: %s\ncommit: %s\ndate: %s\n", version, commit, date)
+		return nil
 	case "dump-config":
 		c, err := loadConfig(configPath, opts...)
 		if err != nil {
