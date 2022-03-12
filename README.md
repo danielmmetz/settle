@@ -47,10 +47,10 @@ Clones the specified repo before settling in.
 
 `settle -command init -repo danielmmetz/settle -auth pubkey -private-key /path/to/key`
 
-Don't yet have settle?
+Don't yet have settle? Install it with:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/danielmmetz/settle/master/settle.sh > /tmp/settle.sh && bash /tmp/settle.sh -command init -repo danielmmetz/settle
+curl -sL https://raw.githubusercontent.com/danielmmetz/settle/master/install.sh | bash
 ```
 
 ### Run history

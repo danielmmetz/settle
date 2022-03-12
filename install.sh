@@ -125,9 +125,3 @@ if [ -n "$binary_error" ]; then
     exit 1
   fi
 fi
-
-if [ $# -eq 0 ]; then
-  exit 0
-fi
-
-exec "$settle_base"/bin/settle $@
