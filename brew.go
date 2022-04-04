@@ -73,6 +73,9 @@ func ensureBrew(ctx context.Context) error {
 		return fmt.Errorf("error writing brew install script: %w", err)
 	}
 	_ = f.Close()
+	if err := os.Chmod(f.Name(), 0755); err != nil {
+		return fmt.Errorf("error setting brew install scipt permission bits: %w", err)
+	}
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", f.Name())
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
