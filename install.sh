@@ -27,7 +27,7 @@
 
 set -euo pipefail
 
-version=0.0.6  # TODO integrate with releases.
+version=0.0.7  # TODO integrate with releases.
 
 settle_base=$(pwd)
 

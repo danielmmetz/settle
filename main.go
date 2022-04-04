@@ -49,6 +49,8 @@ func mainE(ctx context.Context) error {
 
 	var opts []option
 	switch target {
+	case "brew":
+		opts = append(opts, withOnlyBrew())
 	case "files":
 		opts = append(opts, withOnlyFiles())
 	case "nvim":
@@ -353,6 +355,12 @@ type settings struct {
 }
 
 type option func(c *config)
+
+func withOnlyBrew() option {
+	return func(c *config) {
+		*c = config{Brew: c.Brew}
+	}
+}
 
 func withOnlyFiles() option {
 	return func(c *config) {

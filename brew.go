@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -18,6 +20,10 @@ type Brew struct {
 func (b *Brew) Ensure(ctx context.Context) error {
 	if b == nil {
 		return nil
+	}
+
+	if err := ensureBrew(ctx); err != nil {
+		return fmt.Errorf("error ensuring brew is installed: %w", err)
 	}
 
 	f, err := os.CreateTemp("", "")
@@ -41,6 +47,40 @@ func (b *Brew) Ensure(ctx context.Context) error {
 		return fmt.Errorf("error running `brew bundle cleanup`: %w\n%s", err, string(output))
 	}
 	return nil
+}
+
+const brewInstallURL = "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
+
+func ensureBrew(ctx context.Context) error {
+	if err := exec.CommandContext(ctx, "which", "brew").Run(); err == nil {
+		return nil
+	}
+	f, err := os.CreateTemp("", "")
+	if err != nil {
+		return fmt.Errorf("error creating temporary file for brew install script: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", brewInstallURL, nil)
+	if err != nil {
+		return fmt.Errorf("error building request for brew install script: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error fetching brew install script: %w", err)
+	}
+	defer resp.Body.Close()
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return fmt.Errorf("error writing brew install script: %w", err)
+	}
+	_ = f.Close()
+
+	cmd := exec.CommandContext(ctx, "bash", "-c", f.Name())
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("error installing brew: %w", err)
+	}
+	return nil
+
 }
 
 func (b *Brew) String() string {
