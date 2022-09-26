@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -19,11 +20,12 @@ type Zsh struct {
 		IgnoreAllDups bool `json:"ignore_all_dups"`
 		IgnoreSpace   bool `json:"ignore_space"`
 	} `json:"history"`
-	Variables   []KV   `json:"variables"`
-	Aliases     []KV   `json:"aliases"`
-	Functions   []KV   `json:"functions"`
-	ExtraPrefix string `json:"extra_prefix"`
-	ExtraSuffix string `json:"extra_suffix"`
+	Paths       []string `json:"paths"`
+	Variables   []KV     `json:"variables"`
+	Aliases     []KV     `json:"aliases"`
+	Functions   []KV     `json:"functions"`
+	ExtraPrefix string   `json:"extra_prefix"`
+	ExtraSuffix string   `json:"extra_suffix"`
 }
 
 type KV struct {
@@ -113,6 +115,14 @@ func (z *Zsh) String() string {
 	}
 	sb.WriteString("\n")
 
+	// path
+	if len(z.Paths) > 0 {
+		if !contains(z.Paths, "$PATH") {
+			z.Paths = append(z.Paths, "$PATH")
+		}
+		sb.WriteString(fmt.Sprintf("export PATH=%s\n", strconv.Quote(strings.Join(z.Paths, ":"))))
+	}
+
 	// variables
 	for _, kv := range z.Variables {
 		sb.WriteString(fmt.Sprintf("export %s=%s\n", kv.Name, kv.Value))
@@ -139,4 +149,13 @@ func (z *Zsh) String() string {
 	sb.WriteString(z.ExtraSuffix)
 	sb.WriteString("\n")
 	return sb.String()
+}
+
+func contains(haystack []string, needle string) bool {
+	for _, hay := range haystack {
+		if hay == needle {
+			return true
+		}
+	}
+	return false
 }
