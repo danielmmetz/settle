@@ -10,12 +10,12 @@ files:
 
 brew:
   taps:
-    - homebrew/core
-    - homebrew/bundle
-    - homebrew/services
-    - homebrew/cask
-    - homebrew/cask-fonts
-    - homebrew/cask-versions
+    - repo: homebrew/core
+    - repo: homebrew/bundle
+    - repo: homebrew/services
+    - repo: homebrew/cask
+    - repo: homebrew/cask-fonts
+    - repo: homebrew/cask-versions
   pkgs:
     # core
     - name: age

@@ -139,18 +139,26 @@ func (t *Taps) UnmarshalJSON(b []byte) error {
 	}
 	seen := map[string]bool{}
 	for _, tap := range intermediary {
-		if seen[string(tap)] {
-			return fmt.Errorf("error: contains duplicate tap %s", string(tap))
+		if seen[tap.String()] {
+			return fmt.Errorf("error: contains duplicate tap %s", tap)
 		}
-		seen[string(tap)] = true
+		seen[tap.String()] = true
 	}
 	*t = intermediary
 	return nil
 }
 
-type Tap string
+type Tap struct {
+	Repo string `json:"repo"`
+	URL  string `json:"url"`
+}
 
-func (t Tap) String() string { return fmt.Sprintf(`tap "%s"`, string(t)) }
+func (t Tap) String() string {
+	if t.URL == "" {
+		return fmt.Sprintf(`tap "%s"`, t.Repo)
+	}
+	return fmt.Sprintf(`tap "%s", "%s"`, t.Repo, t.URL)
+}
 
 type Pkgs []Pkg
 
