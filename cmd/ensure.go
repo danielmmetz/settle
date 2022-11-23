@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/danielmmetz/settle/internal/config"
+	"github.com/peterbourgon/ff/v3"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-func Ensure() *ffcli.Command {
+func Ensure(settingsPath string) *ffcli.Command {
 	fs := flag.NewFlagSet("settle ensure", flag.ExitOnError)
 	configPath := fs.String("config", "", "use config file at given path")
 	target := fs.String("target", "", "apply only specified stanza of the config")
@@ -18,6 +19,11 @@ func Ensure() *ffcli.Command {
 		Name:       "ensure",
 		ShortUsage: "settle ensure [-config path] [-target files|brew|apt|nvim|zsh]",
 		FlagSet:    fs,
+		Options: []ff.Option{
+			ff.WithConfigFile(settingsPath),
+			ff.WithConfigFileParser(config.Parser()),
+			ff.WithAllowMissingConfigFile(true),
+		},
 		Exec: func(ctx context.Context, _ []string) error {
 			c, err := config.Load(*configPath, config.OptionFrom(*target))
 			if err != nil {

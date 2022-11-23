@@ -14,11 +14,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/peterbourgon/ff/v3"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"golang.org/x/term"
 )
 
-func Init() *ffcli.Command {
+func Init(settingsPath string) *ffcli.Command {
 	fs := flag.NewFlagSet("settle init", flag.ExitOnError)
 	repo := fs.String("repo", "", "clone specified repo, then ensure (format: owner/repo)")
 	authMethod := fs.String("auth", "", `use specified auth type for clone ("", "basic", "pubkey")`)
@@ -30,6 +31,11 @@ func Init() *ffcli.Command {
 		Name:       "init",
 		ShortUsage: "settle init -repo owner/repo [-auth basic|pubkey] [-private-key path/to/.pem] [-config path] [-format json|yaml] [-target files|brew|apt|nvim|zsh]",
 		FlagSet:    fs,
+		Options: []ff.Option{
+			ff.WithConfigFile(settingsPath),
+			ff.WithConfigFileParser(config.Parser()),
+			ff.WithAllowMissingConfigFile(true),
+		},
 		Exec: func(ctx context.Context, _ []string) error {
 			repoParts := strings.Split(*repo, "/")
 			if len(repoParts) != 2 {

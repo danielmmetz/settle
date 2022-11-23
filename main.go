@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/danielmmetz/settle/cmd"
@@ -18,15 +19,22 @@ var (
 )
 
 func mainE(ctx context.Context) error {
-	ensure := cmd.Ensure()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home dir: %w", err)
+	}
+	settingsPath := filepath.Join(home, ".config", "settle", "settings.yaml")
+
+	ensure := cmd.Ensure(settingsPath)
 	var root ffcli.Command
 	root = ffcli.Command{
+		Name:       "",
 		ShortUsage: "settle <subcommand>",
 		ShortHelp:  "Pass -h to see other subcommands. Defaults to `ensure` if no subcommand is provided.",
 		Subcommands: []*ffcli.Command{
-			cmd.Init(),
+			cmd.Init(settingsPath),
 			ensure,
-			cmd.DumpConfig(),
+			cmd.DumpConfig(settingsPath),
 			cmd.Version(version, commit, date),
 		},
 		Exec: func(ctx context.Context, args []string) error {

@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/danielmmetz/settle/internal/config"
+	"github.com/peterbourgon/ff/v3"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
-func DumpConfig() *ffcli.Command {
+func DumpConfig(settingsPath string) *ffcli.Command {
 	fs := flag.NewFlagSet("settle dump-config", flag.ExitOnError)
 	path := fs.String("config", "", "use config file at given path")
 	format := fs.String("format", "json", "output format (json or yaml)")
@@ -19,6 +20,11 @@ func DumpConfig() *ffcli.Command {
 		Name:       "dump-config",
 		ShortUsage: "settle dump-config [-config path] [-format json|yaml] [-target files|brew|apt|nvim|zsh]",
 		FlagSet:    fs,
+		Options: []ff.Option{
+			ff.WithConfigFile(settingsPath),
+			ff.WithConfigFileParser(config.Parser()),
+			ff.WithAllowMissingConfigFile(true),
+		},
 		Exec: func(_ context.Context, _ []string) error {
 			c, err := config.Load(*path, config.OptionFrom(*target))
 			if err != nil {

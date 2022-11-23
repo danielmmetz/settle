@@ -3,8 +3,8 @@ package config
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,19 +15,17 @@ import (
 	"github.com/danielmmetz/settle/internal/nvim"
 	"github.com/danielmmetz/settle/internal/zsh"
 	"github.com/ghodss/yaml"
+	"github.com/peterbourgon/ff/v3"
 )
 
 // Load loads the config at path.
-// If path == "", it will attempt to infer the config path.
+// If path == "", it will attempt to load settle.yaml.
 // Note: Load may change the program's working directory
 // so that it may correctly handle relative paths.
 func Load(path string, opts ...Option) (Config, error) {
 	var err error
 	if path == "" {
-		path, err = inferConfigPath()
-		if err != nil {
-			return Config{}, fmt.Errorf("error inferring config file path: %w", err)
-		}
+		path = "settle.yaml"
 	}
 
 	absConfigPath, err := filepath.Abs(path)
@@ -53,33 +51,6 @@ func Load(path string, opts ...Option) (Config, error) {
 		o(&c)
 	}
 	return c, nil
-}
-
-// inferConfigPath infers the config file path using the following priorities:
-// 1. last used config file path (as stored in settings.yaml)
-// 2. settle.yaml
-func inferConfigPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("unable to determine home dir: %w", err)
-	}
-	settingsPath := filepath.Join(home, ".config", "settle", "settings.yaml")
-	b, err := os.ReadFile(settingsPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("error reading %s: %w", settingsPath, err)
-	}
-	var configPath string
-	if err == nil {
-		var s settings
-		if err := yaml.Unmarshal(b, &s); err != nil {
-			return "", fmt.Errorf("error parsing %s: %w", settingsPath, err)
-		}
-		configPath = s.ConfigPath
-	}
-	if configPath == "" {
-		configPath = "settle.yaml"
-	}
-	return configPath, nil
 }
 
 func WriteBackup(c Config) error {
@@ -241,5 +212,22 @@ func OnlyNvim() Option {
 func OnlyZsh() Option {
 	return func(c *Config) {
 		*c = Config{Zsh: c.Zsh}
+	}
+}
+
+func Parser() ff.ConfigFileParser {
+	return func(r io.Reader, set func(name, value string) error) error {
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return fmt.Errorf("reading: %w", err)
+		}
+		var s settings
+		if err := yaml.Unmarshal(b, &s); err != nil {
+			return fmt.Errorf("yaml unmarshal: %w", err)
+		}
+		if err := set("config", s.ConfigPath); err != nil {
+			return fmt.Errorf("set config=%s: %w", s.ConfigPath, err)
+		}
+		return nil
 	}
 }
