@@ -1,4 +1,4 @@
-package main
+package nvim
 
 import (
 	"context"

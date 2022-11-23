@@ -41,11 +41,11 @@ See [here for an example config](./settle.yaml).
 
 Clones the specified repo before settling in.
 
-`settle -command init -repo danielmmetz/settle`
+`settle init -repo danielmmetz/settle`
 
-`settle -command init -repo danielmmetz/settle -auth basic`
+`settle init -repo danielmmetz/settle -auth basic`
 
-`settle -command init -repo danielmmetz/settle -auth pubkey -private-key /path/to/key`
+`settle init -repo danielmmetz/settle -auth pubkey -private-key /path/to/key`
 
 Don't yet have settle? Install it with:
 
