@@ -83,7 +83,6 @@ func ensureBrew(ctx context.Context) error {
 		return fmt.Errorf("error installing brew: %w", err)
 	}
 	return nil
-
 }
 
 func (b *Brew) String() string {

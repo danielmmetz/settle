@@ -34,7 +34,6 @@ func Ensure() *ffcli.Command {
 			}
 
 			return config.WriteBackup(c)
-
 		},
 	}
 }

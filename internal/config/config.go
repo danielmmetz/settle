@@ -218,7 +218,6 @@ func OptionFrom(target string) Option {
 	default:
 		return func(c *Config) {}
 	}
-
 }
 
 func OnlyBrew() Option {

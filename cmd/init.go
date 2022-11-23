@@ -89,7 +89,6 @@ func Init() *ffcli.Command {
 			}
 
 			return config.WriteBackup(c)
-
 		},
 	}
 }
