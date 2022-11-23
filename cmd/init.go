@@ -84,7 +84,7 @@ func Init() *ffcli.Command {
 			}
 
 			if *target != "" {
-				fmt.Println("skipping writing of settings.yaml and creating settle.yaml backup: non-zero target specified:", target)
+				fmt.Println("skipping writing of settings.yaml and creating settle.yaml backup: non-zero target specified:", *target)
 				return nil
 			}
 
