@@ -34,7 +34,7 @@ settle_base=$(pwd)
 check_binary() {
   echo -n "present version: "
   local output
-  output=$("$settle_base"/bin/settle -command version 2>&1)
+  output=$("$settle_base"/bin/settle version 2>&1)
   if [ $? -ne 0 ]; then
     echo "error: $output"
     binary_error="invalid binary"
@@ -113,8 +113,8 @@ if [ -n "$binary_error" ]; then
     echo "  - $binary_error !!!"
   fi
   if command -v go > /dev/null; then
-    echo -n "building binary (go install github.com/danielmmetz/settle) ... "
-    if go install github.com/danielmmetz/settle; then
+    echo -n "building binary (go install github.com/danielmmetz/settle@latest) ... "
+    if go install github.com/danielmmetz/settle@latest; then
       echo "success!"
     else
       echo "install failed: failed to build binary"
