@@ -73,7 +73,7 @@ func ensureBrew(ctx context.Context) error {
 		return fmt.Errorf("error writing brew install script: %w", err)
 	}
 	_ = f.Close()
-	if err := os.Chmod(f.Name(), 0755); err != nil {
+	if err := os.Chmod(f.Name(), 0o755); err != nil {
 		return fmt.Errorf("error setting brew install scipt permission bits: %w", err)
 	}
 

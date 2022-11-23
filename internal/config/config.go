@@ -93,21 +93,21 @@ func WriteBackup(c Config) error {
 		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
 
-	_ = os.MkdirAll(filepath.Join(home, ".config", "settle"), 0755)
+	_ = os.MkdirAll(filepath.Join(home, ".config", "settle"), 0o755)
 	err = os.WriteFile(
 		filepath.Join(home, ".config", "settle", "settings.yaml"),
 		settingsBytes,
-		0644,
+		0o644,
 	)
 	if err != nil {
 		return fmt.Errorf("error writing settings.yaml: %w", err)
 	}
 	xdgDataDir := filepath.Join(home, ".local", "share")
-	_ = os.MkdirAll(filepath.Join(xdgDataDir, "settle"), 0755)
+	_ = os.MkdirAll(filepath.Join(xdgDataDir, "settle"), 0o755)
 	err = os.WriteFile(
 		filepath.Join(home, ".local", "share", "settle", fmt.Sprintf("%s.yaml", time.Now().Local().Format("2006-01-02 15:04:05"))),
 		c.YAML(),
-		0644,
+		0o644,
 	)
 	if err != nil {
 		return fmt.Errorf("error writing settle.yaml copy: %w", err)
