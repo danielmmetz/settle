@@ -14,7 +14,7 @@ import (
 	"github.com/danielmmetz/settle/internal/files"
 	"github.com/danielmmetz/settle/internal/nvim"
 	"github.com/danielmmetz/settle/internal/zsh"
-	"gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 )
 
 // Load loads the config at path.
