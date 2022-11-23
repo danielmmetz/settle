@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"golang.org/x/exp/slices"
 )
 
 type Zsh struct {
@@ -117,7 +118,7 @@ func (z *Zsh) String() string {
 
 	// path
 	if len(z.Paths) > 0 {
-		if !contains(z.Paths, "$PATH") {
+		if !slices.Contains(z.Paths, "$PATH") {
 			z.Paths = append(z.Paths, "$PATH")
 		}
 		sb.WriteString(fmt.Sprintf("export PATH=%s\n", strconv.Quote(strings.Join(z.Paths, ":"))))
@@ -149,13 +150,4 @@ func (z *Zsh) String() string {
 	sb.WriteString(z.ExtraSuffix)
 	sb.WriteString("\n")
 	return sb.String()
-}
-
-func contains(haystack []string, needle string) bool {
-	for _, hay := range haystack {
-		if hay == needle {
-			return true
-		}
-	}
-	return false
 }
