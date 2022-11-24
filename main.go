@@ -42,6 +42,9 @@ func mainE(ctx context.Context) error {
 			if command != "" && command != "ensure" {
 				return fmt.Errorf("unknown subcommand %s", command)
 			}
+			if err := ensure.Parse(args); err != nil {
+				return fmt.Errorf("parse args: %w", err)
+			}
 			return ensure.Exec(ctx, args)
 		},
 	}
