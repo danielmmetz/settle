@@ -99,22 +99,19 @@ brew:
     - vlc
 
 zsh:
-  zinit:
-    - ice pick=async.zsh src=pure.zsh
-    - light sindresorhus/pure
-    - light zdharma-continuum/fast-syntax-highlighting
-    - snippet OMZ::plugins/fasd/fasd.plugin.zsh
-    - snippet OMZ::plugins/fzf/fzf.plugin.zsh
+  zsh4humans: true
   history:
     size: 50000
     share_history: true
     inc_append: true
     ignore_all_dups: true
     ignore_space: true
+  paths:
+    - $HOME/go/bin
+    - $HOME/bin
   variables:
     - {name: DOTFILES, value: "$HOME/src/danielmmetz/dotfiles"}
     - {name: EDITOR, value: "nvim"}
-    - {name: PATH, value: "$PATH:$HOME/go/bin:$HOME/bin"}
     - {name: HOMEBREW_NO_AUTO_UPDATE, value: "1"}
   aliases:
     - {name: cat, value: "bat"}
@@ -126,29 +123,27 @@ zsh:
     - {name: vim, value: "nvim"}
     - {name: vimrc, value: "nvim $DOTFILES/nvim.yaml"}
     - {name: zshrc, value: "nvim $DOTFILES/settle.yaml"}
-  extra_prefix: |
-    if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
-        echo "Installing DHARMA Initiative Plugin Manager (zdharma-continuum/zinit)…"
-        mkdir -p "$HOME/.zinit" && chmod g-rwX "$HOME/.zinit"
-        git clone https://github.com/zdharma-continuum/zinit "$HOME/.zinit/bin" && \
-            echo "Installation successful" || \
-            echo "The clone has failed."
-    fi
+  prefix: |
+    zstyle ':z4h:' auto-update      'no'
+    zstyle ':z4h:bindkey' keyboard  'mac'
+    zstyle ':z4h:' start-tmux       no
+    zstyle ':z4h:' term-shell-integration 'yes'
+    zstyle ':z4h:autosuggestions' forward-char 'accept'
+    zstyle ':z4h:fzf-complete' recurse-dirs 'no'
+    zstyle ':z4h:direnv'         enable 'no'
+    zstyle ':z4h:direnv:success' notify 'yes'
+    zstyle ':z4h:ssh:*'                   enable 'no'
+    # Anything that requires I/O must be done at this point.
+    z4h init || return
 
-    source "$HOME/.zinit/bin/zinit.zsh"
-    autoload -Uz _zinit
-    (( ${+_comps} )) && _comps[zinit]=_zinit
-  extra_suffix: |
-    _direnv_hook() {
-    trap -- '' SIGINT;
-      eval "$("/usr/local/bin/direnv" export zsh)";
-      trap - SIGINT;
-    }
-    typeset -ag precmd_functions;
-    if [[ -z ${precmd_functions[(r)_direnv_hook]} ]]; then
-      precmd_functions=( _direnv_hook ${precmd_functions[@]} )
-    fi
-    typeset -ag chpwd_functions;
-    if [[ -z ${chpwd_functions[(r)_direnv_hook]} ]]; then
-      chpwd_functions=( _direnv_hook ${chpwd_functions[@]} )
-    fi
+    z4h bindkey undo Ctrl+/   Shift+Tab  # undo the last command line change
+    z4h bindkey redo Option+/            # redo the last undone command line change
+
+    z4h bindkey z4h-cd-back    Shift+Left   # cd into the previous directory
+    z4h bindkey z4h-cd-forward Shift+Right  # cd into the next directory
+    z4h bindkey z4h-cd-up      Shift+Up     # cd into the parent directory
+    z4h bindkey z4h-cd-down    Shift+Down   # cd into a child directory
+
+    autoload -Uz zmv
+  suffix: |
+    # hello everybody

@@ -3,30 +3,31 @@ package zsh
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
 	"golang.org/x/exp/slices"
 )
 
 type Zsh struct {
-	Zinit   []string `json:"zinit"`
-	History struct {
+	Zsh4Humans bool `json:"zsh4humans"`
+	History    struct {
 		Size          int  `json:"size"`
 		ShareHistory  bool `json:"share_history"`
 		IncAppend     bool `json:"inc_append"`
 		IgnoreAllDups bool `json:"ignore_all_dups"`
 		IgnoreSpace   bool `json:"ignore_space"`
 	} `json:"history"`
-	Paths       []string `json:"paths"`
-	Variables   []KV     `json:"variables"`
-	Aliases     []KV     `json:"aliases"`
-	Functions   []KV     `json:"functions"`
-	ExtraPrefix string   `json:"extra_prefix"`
-	ExtraSuffix string   `json:"extra_suffix"`
+	Paths     []string `json:"paths"`
+	Variables []KV     `json:"variables"`
+	Aliases   []KV     `json:"aliases"`
+	Functions []KV     `json:"functions"`
+	Prefix    string   `json:"prefix"`
+	Suffix    string   `json:"suffix"`
 }
 
 type KV struct {
@@ -39,7 +40,7 @@ func (z *Zsh) Ensure(ctx context.Context) error {
 		return nil
 	}
 
-	if err := z.ensureZinit(ctx); err != nil {
+	if err := z.ensureZsh4Humans(ctx); err != nil {
 		return fmt.Errorf("error ensuring zinit: %w", err)
 	}
 	home, err := os.UserHomeDir()
@@ -53,12 +54,8 @@ func (z *Zsh) Ensure(ctx context.Context) error {
 	return nil
 }
 
-const (
-	zinitURL = "https://raw.githubusercontent.com/zdharma-continuum/zinit/master/zinit.zsh"
-)
-
-func (z *Zsh) ensureZinit(ctx context.Context) error {
-	if len(z.Zinit) == 0 {
+func (z *Zsh) ensureZsh4Humans(ctx context.Context) error {
+	if !z.Zsh4Humans {
 		return nil
 	}
 
@@ -66,19 +63,35 @@ func (z *Zsh) ensureZinit(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to determine home dir: %w", err)
 	}
-	dstPath := filepath.Join(home, ".zinit", "bin", "zinit.zsh")
+	zshenv := filepath.Join(home, ".zshenv")
 
-	_, err = os.Stat(dstPath)
+	_, err = os.Stat(zshenv)
 	if err == nil {
 		return nil // file already exists
 	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	fmt.Println("installing Zinit")
-	_, err = git.PlainCloneContext(ctx, filepath.Join(home, ".zinit", "bin"), false, &git.CloneOptions{URL: "https://github.com/zdharma-continuum/zinit.git"})
+	fmt.Println("writing zsh4humans .zshenv file")
+	url := "https://raw.githubusercontent.com/romkatv/zsh4humans/v5/.zshenv"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return fmt.Errorf("error cloning zinit: %w", err)
+		return fmt.Errorf("building request to fetch zsh4humans .zshenv: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("fetching zsh4humans .zshenv: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading zsh4humans .zshenv body: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("bad response fetching %s (%d): %s", url, resp.StatusCode, string(body))
+	}
+	if err := os.WriteFile(zshenv, body, 0o644); err != nil {
+		return fmt.Errorf("writing .zshenv: %w", err)
 	}
 	return nil
 }
@@ -87,13 +100,7 @@ func (z *Zsh) String() string {
 	var sb strings.Builder
 
 	// extra prefix
-	sb.WriteString(z.ExtraPrefix)
-	sb.WriteString("\n")
-
-	// zinit
-	for _, line := range z.Zinit {
-		sb.WriteString(fmt.Sprintf("zinit %s\n", line))
-	}
+	sb.WriteString(z.Prefix)
 	sb.WriteString("\n")
 
 	// history
@@ -147,7 +154,7 @@ func (z *Zsh) String() string {
 	sb.WriteString("\n")
 
 	// extra suffix
-	sb.WriteString(z.ExtraSuffix)
+	sb.WriteString(z.Suffix)
 	sb.WriteString("\n")
 	return sb.String()
 }
