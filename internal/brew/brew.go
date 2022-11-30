@@ -200,15 +200,18 @@ type Pkg struct {
 }
 
 func (p Pkg) String() string {
-	components := []string{fmt.Sprintf(`brew "%s"`, p.Name)}
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("brew %q", p.Name))
 	if len(p.Args) > 0 {
-		components = append(components, ", args: [")
+		sb.WriteString(", args: [")
+		var arrayEntries []string
 		for _, arg := range p.Args {
-			components = append(components, fmt.Sprintf(`"%s"`, arg))
+			arrayEntries = append(arrayEntries, fmt.Sprintf("%q", arg))
 		}
-		components = append(components, "]")
+		sb.WriteString(strings.Join(arrayEntries, ","))
+		sb.WriteString("]")
 	}
-	return strings.Join(components, "")
+	return sb.String()
 }
 
 type Casks []Cask
