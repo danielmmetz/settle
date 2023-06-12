@@ -22,7 +22,6 @@ See [here for an example config](./settle.yaml).
 * cleans up packages no longer specified
 
 **Zsh Support**:
-* installing zsh4humans's .zshenv
 * configuring history size and history sharing
 * variables
 * aliases

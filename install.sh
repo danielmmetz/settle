@@ -27,7 +27,7 @@
 
 set -euo pipefail
 
-version=0.0.16  # TODO integrate with releases.
+version="$(curl -sL https://api.github.com/repos/danielmmetz/settle/releases/latest | jq '.tag_name' | sed -e 's/^v//' -e 's/"//g')"
 
 settle_base=$(pwd)
 
@@ -58,11 +58,6 @@ try_curl() {
   curl -fsSL $1 | tar -xzf -
 }
 
-try_wget() {
-  command -v wget > /dev/null &&
-  wget --quiet -O - $1 | tar -xzf -
-}
-
 download() {
   if [ -x "$settle_base"/bin/settle ]; then
     echo "settle already exists"
@@ -78,9 +73,9 @@ download() {
   local url
   url=https://github.com/danielmmetz/settle/releases/download/v$version/${1}
   set -o pipefail
-  if ! (try_curl $url || try_wget $url); then
+  if ! (try_curl $url); then
     set +o pipefail
-    binary_error="failed to download with curl and wget"
+    binary_error="failed to download with curl"
     return
   fi
   set +o pipefail

@@ -14,7 +14,6 @@ import (
 )
 
 type Zsh struct {
-	Zsh4Humans bool `json:"zsh4humans"`
 	History    struct {
 		Size          int  `json:"size"`
 		ShareHistory  bool `json:"share_history"`
@@ -40,9 +39,6 @@ func (z *Zsh) Ensure(ctx context.Context) error {
 		return nil
 	}
 
-	if err := z.ensureZsh4Humans(ctx); err != nil {
-		return fmt.Errorf("error ensuring zinit: %w", err)
-	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("unable to determine home dir: %w", err)
@@ -50,48 +46,6 @@ func (z *Zsh) Ensure(ctx context.Context) error {
 	fmt.Println("writing .zshrc")
 	if err := os.WriteFile(filepath.Join(home, ".zshrc"), []byte(z.String()), 0o644); err != nil {
 		return fmt.Errorf("error writing .zshrc: %w", err)
-	}
-	return nil
-}
-
-func (z *Zsh) ensureZsh4Humans(ctx context.Context) error {
-	if !z.Zsh4Humans {
-		return nil
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("unable to determine home dir: %w", err)
-	}
-	zshenv := filepath.Join(home, ".zshenv")
-
-	_, err = os.Stat(zshenv)
-	if err == nil {
-		return nil // file already exists
-	} else if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	fmt.Println("writing zsh4humans .zshenv file")
-	url := "https://raw.githubusercontent.com/romkatv/zsh4humans/v5/.zshenv"
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("building request to fetch zsh4humans .zshenv: %w", err)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("fetching zsh4humans .zshenv: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading zsh4humans .zshenv body: %w", err)
-	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("bad response fetching %s (%d): %s", url, resp.StatusCode, string(body))
-	}
-	if err := os.WriteFile(zshenv, body, 0o644); err != nil {
-		return fmt.Errorf("writing .zshenv: %w", err)
 	}
 	return nil
 }
