@@ -3,8 +3,6 @@ package zsh
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,7 +12,7 @@ import (
 )
 
 type Zsh struct {
-	History    struct {
+	History struct {
 		Size          int  `json:"size"`
 		ShareHistory  bool `json:"share_history"`
 		IncAppend     bool `json:"inc_append"`
