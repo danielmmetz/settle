@@ -13,6 +13,7 @@ import (
 	"github.com/danielmmetz/settle/internal/brew"
 	"github.com/danielmmetz/settle/internal/files"
 	"github.com/danielmmetz/settle/internal/nvim"
+	"github.com/danielmmetz/settle/internal/pacman"
 	"github.com/danielmmetz/settle/internal/zsh"
 	"github.com/ghodss/yaml"
 	"github.com/peterbourgon/ff/v3"
@@ -87,11 +88,12 @@ func WriteBackup(c Config) error {
 }
 
 type Config struct {
-	Files *files.Files `json:"files"`
-	Brew  *brew.Brew   `json:"brew"`
-	Apt   *apt.Apt     `json:"apt"`
-	Nvim  *nvim.Nvim   `json:"nvim"`
-	Zsh   *zsh.Zsh     `json:"zsh"`
+	Files  *files.Files   `json:"files"`
+	Brew   *brew.Brew     `json:"brew"`
+	Apt    *apt.Apt       `json:"apt"`
+	Pacman *pacman.Pacman `json:"pacman"`
+	Nvim   *nvim.Nvim     `json:"nvim"`
+	Zsh    *zsh.Zsh       `json:"zsh"`
 
 	// absPath is the absolute path to where config exists on disk.
 	absPath string
@@ -99,12 +101,13 @@ type Config struct {
 
 func (c *Config) UnmarshalJSON(b []byte) error {
 	type clone struct {
-		Includes []string     `json:"includes"`
-		Files    *files.Files `json:"files"`
-		Brew     *brew.Brew   `json:"brew"`
-		Apt      *apt.Apt     `json:"apt"`
-		Nvim     *nvim.Nvim   `json:"nvim"`
-		Zsh      *zsh.Zsh     `json:"zsh"`
+		Includes []string       `json:"includes"`
+		Files    *files.Files   `json:"files"`
+		Brew     *brew.Brew     `json:"brew"`
+		Apt      *apt.Apt       `json:"apt"`
+		Pacman   *pacman.Pacman `json:"pacman"`
+		Nvim     *nvim.Nvim     `json:"nvim"`
+		Zsh      *zsh.Zsh       `json:"zsh"`
 	}
 	var original clone
 	if err := json.Unmarshal(b, &original); err != nil {
@@ -130,6 +133,9 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	}
 	if original.Apt != nil {
 		final.Apt = original.Apt
+	}
+	if original.Pacman != nil {
+		final.Pacman = original.Pacman
 	}
 	if original.Nvim != nil {
 		final.Nvim = original.Nvim
@@ -161,6 +167,9 @@ func (c *Config) Ensure(ctx context.Context) error {
 	if err := c.Brew.Ensure(ctx); err != nil {
 		return fmt.Errorf("error ensuring brew: %w", err)
 	}
+	if err := c.Pacman.Ensure(ctx); err != nil {
+		return fmt.Errorf("error ensuring pacman: %w", err)
+	}
 	if err := c.Nvim.Ensure(ctx); err != nil {
 		return fmt.Errorf("error ensuring nvim: %w", err)
 	}
@@ -180,6 +189,8 @@ func OptionFrom(target string) Option {
 	switch target {
 	case "brew":
 		return OnlyBrew()
+	case "pacman":
+		return OnlyPacman()
 	case "files":
 		return OnlyFiles()
 	case "nvim":
@@ -194,6 +205,12 @@ func OptionFrom(target string) Option {
 func OnlyBrew() Option {
 	return func(c *Config) {
 		*c = Config{Brew: c.Brew}
+	}
+}
+
+func OnlyPacman() Option {
+	return func(c *Config) {
+		*c = Config{Pacman: c.Pacman}
 	}
 }
 

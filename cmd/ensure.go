@@ -17,7 +17,7 @@ func Ensure(settingsPath string) *ffcli.Command {
 
 	return &ffcli.Command{
 		Name:       "ensure",
-		ShortUsage: "settle ensure [-config path] [-target files|brew|apt|nvim|zsh]",
+		ShortUsage: "settle ensure [-config path] [-target files|brew|apt|pacman|nvim|zsh]",
 		FlagSet:    fs,
 		Options: []ff.Option{
 			ff.WithConfigFile(settingsPath),
