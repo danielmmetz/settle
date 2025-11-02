@@ -32,7 +32,6 @@ func mainE(ctx context.Context) error {
 		ShortUsage: "settle <subcommand>",
 		ShortHelp:  "Pass -h to see other subcommands. Defaults to `ensure` if no subcommand is provided.",
 		Subcommands: []*ffcli.Command{
-			cmd.Init(settingsPath),
 			ensure,
 			cmd.DumpConfig(settingsPath),
 			cmd.Version(version, commit, date),

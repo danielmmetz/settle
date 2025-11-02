@@ -38,15 +38,7 @@ See [here for an example config](./settle.yaml).
 
 ### Bootstrapping
 
-Clones the specified repo before settling in.
-
-`settle init -repo danielmmetz/settle`
-
-`settle init -repo danielmmetz/settle -auth basic`
-
-`settle init -repo danielmmetz/settle -auth pubkey -private-key /path/to/key`
-
-Don't yet have settle? Install it with:
+Install settle with:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/danielmmetz/settle/master/install.sh | bash
